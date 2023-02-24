@@ -10,7 +10,7 @@ February 2023
 #https://www.analyticsvidhya.com/blog/2021/06/complete-guide-on-how-to-use-autoencoders-in-python/
 
 from os.path import exists
-from numpy import expand_dims
+from numpy import array
 from keras.models import model_from_json
 from keras import Sequential
 from keras import Model
@@ -23,6 +23,7 @@ from keras.layers import Reshape
 from keras.layers import UpSampling2D
 from keras import backend as K
 import matplotlib.pyplot as plt
+from cv2 import cvtColor, COLOR_BGR2RGB
 import keras.utils as image
 
 
@@ -39,36 +40,22 @@ class AutoEncoders(Model):
     """
 
     def __init__(self, inputSize=[28,28], colors = 3):
-        super().__init__()
-        
-        self.xSize = inputSize[0]
-        self.ySize = inputSize[1]
-        self.color = colors
-        self.model = Sequential()
-        #Encoder
-        self.model.add(Conv2D(30,3,activation='relu',padding='same', input_shape=(self.xSize,self.ySize,self.color)))
-        self.model.add(MaxPooling2D(2,padding='same'))
-        self.model.add(Conv2D(15,3,activation='relu',padding='same'))
-        self.model.add(MaxPooling2D(2,padding='same'))
-        
-        #Decoder
-        self.model.add(Conv2D(15,3,activation='relu',padding='same'))
-        self.model.add(UpSampling2D(2))
-        self.model.add(Conv2D(30,3,activation='relu',padding='same'))
-        self.model.add(UpSampling2D(2))
-        
-        #Output
-        self.model.add(Conv2D(self.color,3,activation='sigmoid',padding='same'))  
+         super().__init__()
+         self.xSize = inputSize[0]
+         self.ySize = inputSize[1]
+         self.color = colors
+         
         
     def build(self, optimizer='adam', loss='binary_crossentropy'):
         self.model.compile(optimizer=optimizer, loss=loss)
         
-    def fit(self,trainInput,testInput, epochs = 15, batch_size = 128):
-        self.model.fit(trainInput,
+    def fit(self,trainInput,validationInput, epochs = 15, batch_size = 128):
+        history = self.model.fit(trainInput,trainInput,
                         epochs=epochs,
                         batch_size=batch_size,
                         shuffle=True,
-                        validation_data=testInput)
+                        validation_data=(validationInput, validationInput))
+        return history
     
     def predict(self, testInput):
         # encoded_imgs = self.encoder.predict(testInput)
@@ -76,16 +63,15 @@ class AutoEncoders(Model):
         return decoded_imgs
         
         
-    def plotPrediction(self, imagePath):
-        testImage = image.load_img(imagePath, target_size = (self.xSize, self.ySize), grayscale = (self.color==1))
-        testImage  = image.img_to_array(testImage)
-        testImage = testImage /255.0
-        testImage = expand_dims(testImage, axis = 0)
-        result = self.predict(testImage)
-        plt.imshow(testImage[0], cmap=plt.get_cmap('gray')) #cmap is ignored when given an rgb image
+    def plotPrediction(self, image):
+        image = array(image)
+        image = image.reshape(-1,self.xSize,self.ySize,image.shape[-1])
+        result = self.predict(image)
+        plt.imshow(image[0,:,:,::-1], cmap=plt.get_cmap('gray')) #cmap is ignored when given an rgb image
         plt.show()
-        plt.imshow(result[0], cmap=plt.get_cmap('gray')) #cmap is ignored when given an rgb image
+        plt.imshow(result[0,:,:,::-1], cmap=plt.get_cmap('gray')) #cmap is ignored when given an rgb image
         plt.show()
+        return image
         
     def printInfos(self):
         print(self.model.summary())
@@ -117,8 +103,47 @@ class AutoEncoders(Model):
         self.model = loadedModel
         
        
+class ConvolutionalAutoEncoders(AutoEncoders):
+    def __init__(self, inputSize=[28,28], colors = 3):
+        super().__init__()
+        AutoEncoders.__init__(self, inputSize, colors)
+        
+        self.model = Sequential()
+        #Encoder
+        self.model.add(Conv2D(30,3,activation='relu',padding='same', input_shape=(self.xSize,self.ySize,self.color)))
+        self.model.add(MaxPooling2D(2,padding='same'))
+        self.model.add(Conv2D(15,3,activation='relu',padding='same'))
+        self.model.add(MaxPooling2D(2,padding='same'))
+        
+        #Decoder
+        self.model.add(Conv2D(15,3,activation='relu',padding='same'))
+        self.model.add(UpSampling2D(2))
+        self.model.add(Conv2D(30,3,activation='relu',padding='same'))
+        self.model.add(UpSampling2D(2))
+        
+        #Output
+        self.model.add(Conv2D(self.color,3,activation='sigmoid',padding='same'))  
 
 
+class AE(AutoEncoders):
+    def __init__(self, inputSize=[28,28], colors = 3):
+        super().__init__()
+        AutoEncoders.__init__(self, inputSize, colors)
+        
+        self.model = Sequential()
+        #Encoder
+        self.model.add(Input(shape = (inputSize[0]* inputSize[1]*colors)))
+        # self.model.add(Dense(4096, activation='relu'))
+        self.model.add(Dense(512, activation='relu'))
+        self.model.add(Dense(256, activation='relu'))
+        self.model.add(Dense(128, activation='relu'))
+        
+        #Decoder
+        self.model.add(Dense(256, activation='relu'))
+        self.model.add(Dense(512, activation='relu'))
+        # self.model.add(Dense(4096, activation='relu'))
+        self.model.add(Dense(inputSize[0]* inputSize[1]*colors, activation ='sigmoid'))
+        
 
 
 # a = AutoEncoders([28,28])
