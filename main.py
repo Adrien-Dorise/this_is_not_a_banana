@@ -11,14 +11,26 @@ import AutoEncoders as AE
 import numpy as np
 import cv2
 
+
+#Dynamic memory
+# from tensorflow.compat.v1 import ConfigProto
+# from tensorflow.compat.v1 import InteractiveSession
+# config = ConfigProto()
+# config.gpu_options.allow_growth = True
+# session = InteractiveSession(config=config)
+# session.close()
+
+
 #Parameters
-xSize = 28
-ySize = 28
-colorMode = 'monochrome' #'rgb', 'monochrome'
+xSize = 128
+ySize = 128
+colorMode = 'rgb' #'rgb', 'monochrome'
 
-epoch = 500
-batch_size = 32
-
+epoch = 250
+batch_size = 16
+optimizer = 'adam' #https://www.tensorflow.org/api_docs/python/tf/keras/optimizers
+loss = 'msle' #https://www.tensorflow.org/api_docs/python/tf/keras/losses
+learningRate = 0.0001
 
 
 
@@ -42,9 +54,9 @@ validationFolder = 'OIDv4_ToolKit/OID/Dataset/validation'
 
 
 if(colorMode == 'rgb'):
-    colors = 3
+    inputShape = (xSize,ySize,3)
 else:
-    colors = 1
+    inputShape = (xSize,ySize,1)
 
 
 # from keras.preprocessing.image import ImageDataGenerator
@@ -70,11 +82,12 @@ else:
 #                                             color_mode=colorMode)
 
 
-train,train_flat = pre.loadFolder(trainFolder + "/Banana", xSize, ySize, colors)
-validation, validation_flat = pre.loadFolder(validationFolder + "/Banana", xSize, ySize, colors)
-test, test_flat = pre.loadFolder(testFolder + "/Banana", xSize, ySize, colors)
+train,train_flat = pre.loadFolder(trainFolder + "/Banana",inputShape)
+validation, validation_flat = pre.loadFolder(validationFolder + "/Banana", inputShape)
+test, test_flat = pre.loadFolder(testFolder + "/Banana", inputShape)
 print(f"Data info: train: {train.shape[0]} / validation: {validation.shape[0]}/ test: {test.shape[0]}")
-pre.plotFlatImage(train_flat[0], xSize, ySize, colors)
+pre.plotFlatImage(train_flat[0], inputShape)
+b= train_flat[0]
 
 
 #MNIST
@@ -85,19 +98,18 @@ x_train = x_train.astype('float32') / 255.
 x_test = x_test.astype('float32') / 255.
 x_train = x_train.reshape((len(x_train), np.prod(x_train.shape[1:])))
 x_test = x_test.reshape((len(x_test), np.prod(x_test.shape[1:])))
-print(x_train.shape)
-print(x_test.shape)
+
 
 
 #!!!!!NEURAL NETWORK!!!!!
 
 
-a = AE.AE([xSize,ySize], colors)
-a.build()
+a = AE.AE(inputShape)
+a.build(optimizer = optimizer, loss = loss, lr = learningRate)
 
 
 # a.printInfos()
-history = a.fit(train_flat,test_flat,epochs=epoch, batch_size = batch_size)
+history = a.fit(train_flat,validation_flat,epochs=epoch, batch_size = batch_size)
 
 
 import matplotlib.pyplot as plt
@@ -119,34 +131,34 @@ saveFile = 'models/AE'
 #!!!!!TESTING!!!!!
 print("Plot")
 
-fileTest = 'OIDv4_ToolKit/OID/Dataset/test/Banana/b179fb7f7e447f77.jpg'
-testImg = pre.loadImage(fileTest, xSize, ySize,colors)
+fileTest = 'OIDv4_ToolKit/OID/Dataset/train/Banana/06a804f6a15ce815.jpg'
+testImg = pre.loadImage(fileTest, inputShape)
 testImg_flat = pre.flattenImage(testImg)
 predict = a.predict(testImg_flat)
-pre.plotFlatImage(testImg_flat[0], xSize, ySize, colors)
-pre.plotFlatImage(predict, xSize, ySize, colors)
+pre.plotFlatImage(testImg_flat[0], inputShape)
+pre.plotFlatImage(predict, inputShape)
 fileTest = 'OIDv4_ToolKit/OID/Dataset/test/Banana/eeb93d366d6c69e7.jpg'
-testImg = pre.loadImage(fileTest, xSize, ySize,colors)
+testImg = pre.loadImage(fileTest, inputShape)
 testImg_flat = pre.flattenImage(testImg)
 predict = a.predict(testImg_flat)
-pre.plotFlatImage(testImg_flat[0], xSize, ySize, colors)
-pre.plotFlatImage(predict, xSize, ySize, colors)
+pre.plotFlatImage(testImg_flat[0], inputShape)
+pre.plotFlatImage(predict, inputShape)
 fileTest = 'OIDv4_ToolKit/OID/Dataset/test/Banana/694f86.jpg'
-testImg = pre.loadImage(fileTest, xSize, ySize,colors)
+testImg = pre.loadImage(fileTest, inputShape)
 testImg_flat = pre.flattenImage(testImg)
 predict = a.predict(testImg_flat)
-pre.plotFlatImage(testImg_flat[0], xSize, ySize, colors)
-pre.plotFlatImage(predict, xSize, ySize, colors)
+pre.plotFlatImage(testImg_flat[0], inputShape)
+pre.plotFlatImage(predict, inputShape)
 
 #Show MNIST
-testImg = x_test[5]
-predict = a.predict(testImg.reshape(-1,784))
-plt.imshow(testImg.reshape(28, 28))
-plt.gray()
-plt.show()
-plt.imshow(predict.reshape(28, 28))
-plt.gray()
-plt.show()
+# testImg = x_test[5]
+# predict = a.predict(testImg.reshape(-1,784))
+# plt.imshow(testImg.reshape(28, 28))
+# plt.gray()
+# plt.show()
+# plt.imshow(predict.reshape(28, 28))
+# plt.gray()
+# plt.show()
 
 
 # from scipy.linalg import norm

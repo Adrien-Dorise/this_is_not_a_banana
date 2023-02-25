@@ -37,21 +37,21 @@ test_set = test_datagen.flow_from_directory(validationFolder,
 """
 
 
-def loadImage(filePath, xSize, ySize,colors):
+def loadImage(filePath, imgShape):
             img=imread(filePath)
-            img=resize(img,(xSize,ySize))
+            img=resize(img,(imgShape[0],imgShape[1]))
             img = img/255.0
-            if(colors == 1):
+            if(imgShape[2] == 1):
                 img = mean(img, -1)
             return img
             
-def loadFolder(folderPath, xSize, ySize, colors):
+def loadFolder(folderPath, imgShape):
     x = []
     x_flat = []
     for img in listdir(folderPath):
         filePath = folderPath + "/" + img
         if(not isdir(filePath)):
-            imgTemp = loadImage(filePath, xSize, ySize,colors) 
+            imgTemp = loadImage(filePath, imgShape) 
             x.append(imgTemp)
             x_flat.append(imgTemp.flatten())
     x = array(x)
@@ -64,15 +64,15 @@ def plotImage(image):
     plt.imshow(image[:,:,::-1])
     plt.show()
     
-def plotFlatImage(image, xSize, ySize, colors):
-    img = reverseFlatten(image, xSize, ySize, colors)
+def plotFlatImage(image, imgShape):
+    img = reverseFlatten(image, imgShape)
     plotImage(img)
     
 def flattenImage(image):
     flatImg = array(image).flatten()
     return flatImg.reshape(-1,len(flatImg))
 
-def reverseFlatten(image,xSize,ySize,colors):
-    return image.reshape(xSize,ySize,colors)    
+def reverseFlatten(image,imgShape):
+    return image.reshape(imgShape[0],imgShape[1],imgShape[2])    
 
 
