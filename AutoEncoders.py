@@ -18,6 +18,7 @@ from keras import backend as K
 import matplotlib.pyplot as plt
 from cv2 import cvtColor, COLOR_BGR2RGB
 import keras.utils as image
+from math import sqrt
 
 
 
@@ -129,6 +130,7 @@ class AE(AutoEncoders):
         super().__init__()
         AutoEncoders.__init__(self, inputShape)
         
+        dropout=0.2
         self.model = Sequential()
         
         #Encoder
@@ -137,25 +139,30 @@ class AE(AutoEncoders):
         self.model.add(Input(shape=((int)(prod(inputShape)))))
         
         self.model.add(Dense(512, activation='relu'))
-        self.model.add(Dropout(0.1))
+        self.model.add(Dropout(dropout))
         self.model.add(Dense(256, activation='relu'))
-        self.model.add(Dropout(0.1))
-        self.model.add(Dense(128, activation='relu'))
-        self.model.add(Dropout(0.1))
+        self.model.add(Dropout(dropout))
+        self.model.add(Dense(64, activation='relu'))
+        self.model.add(Dropout(dropout))
         
         #Decoder
         self.model.add(Dense(256, activation='relu'))
-        self.model.add(Dropout(0.1))
+        self.model.add(Dropout(dropout))
         self.model.add(Dense(512, activation='relu'))
-        self.model.add(Dropout(0.1))
+        self.model.add(Dropout(dropout))
         
         # self.model.add(Dense(prod(inputShape), activation='relu'))
         # self.model.add(Reshape(inputShape))        
-        self.model.add(Dense(prod(inputShape), activation ='relu'))
+        self.model.add(Dense(prod(inputShape)))
         
 
 
-       
+def score(target,prediction):
+    score = 0
+    for i in range(len(target)):
+        diff = target[i] - prediction[i]
+        score += sqrt(diff ** 2)
+    return score
 
 
 # a = AutoEncoders([28,28])
