@@ -111,6 +111,8 @@ class ConvolutionalAutoEncoders(NeuralNetwork):
         super().__init__()
         NeuralNetwork.__init__(self, inputShape)
         
+        self.modelName = "CNN auto-encoders"
+        
         self.model = Sequential()
         #Encoder
         self.model.add(Conv2D(30,3,activation='relu',padding='same', input_shape=inputShape))
@@ -133,6 +135,8 @@ class AE(NeuralNetwork):
         super().__init__()
         NeuralNetwork.__init__(self, inputShape)
         
+        self.modelName = "fully connected auto-encoders"
+        
         dropout=0.2
         self.model = Sequential()
         
@@ -143,33 +147,41 @@ class AE(NeuralNetwork):
         
         self.model.add(Dense(512, activation='relu'))
         self.model.add(Dropout(dropout))
-        self.model.add(Dense(128, activation='relu'))
+        self.model.add(Dense(256, activation='relu'))
         self.model.add(Dropout(dropout))
-
+        self.model.add(Dense(64, activation='relu'))
+        self.model.add(Dropout(dropout))
         
         #Decoder
+        self.model.add(Dense(256, activation='relu'))
+        self.model.add(Dropout(dropout))
         self.model.add(Dense(512, activation='relu'))
         self.model.add(Dropout(dropout))
         
         # self.model.add(Dense(prod(inputShape), activation='relu'))
         # self.model.add(Reshape(inputShape))        
-        self.model.add(Dense(prod(inputShape), activation='sigmoid'))
+        self.model.add(Dense(prod(inputShape), activation=None))
         
 class AECNN(NeuralNetwork):
     def __init__(self, inputShape = (28,28,3)):
         super().__init__()
         NeuralNetwork.__init__(self, inputShape)
         
-        dropout=0.2
+        self.modelName = "fully connected + CNN auto-encoders"
+        
+        dropout=0.25
         self.model = Sequential()
         
         #CNN encoder
         self.model.add(Conv2D(30,3,activation='relu',padding='same', input_shape=inputShape))
         self.model.add(MaxPooling2D(2,padding='same'))
+        self.model.add(Dropout(dropout))
         self.model.add(Conv2D(15,3,activation='relu',padding='same'))
         self.model.add(MaxPooling2D(2,padding='same'))
+        self.model.add(Dropout(dropout))
         self.model.add(Conv2D(7,3,activation='relu',padding='same'))
         self.model.add(MaxPooling2D(2,padding='same'))
+        self.model.add(Dropout(dropout))
         
         #Flatten
         shape = self.model.output_shape
@@ -182,7 +194,7 @@ class AECNN(NeuralNetwork):
         self.model.add(Dropout(dropout))
         self.model.add(Dense(516, activation='relu'))
         self.model.add(Dropout(dropout))
-        self.model.add(Dense(64, activation='relu'))
+        self.model.add(Dense(258, activation='relu'))
         self.model.add(Dropout(dropout))
         
         #Decoder
@@ -196,13 +208,16 @@ class AECNN(NeuralNetwork):
         
         self.model.add(Conv2D(7,3,activation='relu',padding='same'))
         self.model.add(UpSampling2D(2))
+        self.model.add(Dropout(dropout))
         self.model.add(Conv2D(15,3,activation='relu',padding='same'))
         self.model.add(UpSampling2D(2))
+        self.model.add(Dropout(dropout))
         self.model.add(Conv2D(30,3,activation='relu',padding='same'))
         self.model.add(UpSampling2D(2))
+        self.model.add(Dropout(dropout))
         
         #Output
-        self.model.add(Conv2D(self.inputShape[-1],3,activation='sigmoid',padding='same'))  
+        self.model.add(Conv2D(self.inputShape[-1],3,activation=None,padding='same'))  
         
     
 def score(target,prediction):

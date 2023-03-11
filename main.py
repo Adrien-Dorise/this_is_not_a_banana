@@ -25,19 +25,19 @@ import transferLearning as tl
 xSize = 128
 ySize = 128
 colorMode = 'rgb' #'rgb', 'monochrome'
-flatInput = False
+flatInput = True
 
 epoch = 5000
-batch_size = 32
+batch_size = 16
 optimizer = 'adam' #https://www.tensorflow.org/api_docs/python/tf/keras/optimizers
 loss = 'msle' #https://www.tensorflow.org/api_docs/python/tf/keras/losses
-learningRate = 0.0001
+learningRate = 0.001
 
 trainFolder = 'OIDv4_ToolKit/OID/Dataset/train'
 testFolder = 'OIDv4_ToolKit/OID/Dataset/test'
 validationFolder = 'OIDv4_ToolKit/OID/Dataset/validation'
 
-resumeTraining = True
+resumeTraining = False
 
 
 
@@ -83,7 +83,7 @@ if not resumeTraining:
 else:
     model, history = pr.resumeTraining(model, history, train, validation, learningRate, epoch, batch_size)
 
-saveFile = 'models/testAECNN'
+saveFile = 'models/AE'
 model.saveModel(saveFile, history, overwrite=False)
 
 # model = nn.AECNN(inputShape)

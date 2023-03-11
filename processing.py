@@ -79,32 +79,33 @@ def reverseFlatten(image,imgShape):
     return image.reshape(imgShape[0],imgShape[1],imgShape[2])    
 
 
-def plotTraining(history):
+def plotTraining(title,history):
     fig = plt.figure(figsize=(6,4),dpi=250)
     plt.grid(True)
     plt.xlabel('Epoch')
     plt.ylabel("Loss")
     plt.plot(history["loss"], label = "Train")
     plt.plot(history["val_loss"], label = "Validation")
-    plt.legend(loc='upper right');
+    plt.legend(loc='upper right')
+    plt.title(title)
     plt.show()
     
     
 def trainNew(trainSet, validSet, inputShape, optimizer, loss, lr, epoch, batch_size):
     history_pd = pd.DataFrame()
-    model = nn.AECNN(inputShape)
+    model = nn.AE(inputShape)
     model.printInfos()
     model.build(optimizer = optimizer, loss = loss, lr = lr)
     history = model.fit(trainSet,validSet,epochs=epoch, batch_size = batch_size)
     history_pd = history_pd.append(pd.DataFrame(history.history), ignore_index=True)
-    plotTraining(history_pd)
+    plotTraining(model.modelName, history_pd)
     return model, history_pd
     
 def resumeTraining(model, history, trainSet, validSet, lr, epoch, batch_size):
     model.model.optimizer.learning_rate = lr
     hist = model.fit(trainSet,validSet,epochs=epoch, batch_size = batch_size)
     history = history.append(pd.DataFrame(hist.history), ignore_index=True)
-    plotTraining(history)
+    plotTraining(model.modelName, history)
     return model, history
 
 def testModel(model, fileTestPath, inputShape, flat=False):
