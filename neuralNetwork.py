@@ -12,6 +12,7 @@ February 2023
 from os.path import exists
 from numpy import array, prod
 from keras.models import model_from_json
+from tensorflow import squeeze
 from keras import Sequential, Model, Input
 from keras.layers import Dense, Dropout, Flatten, Conv2D, MaxPooling2D, Reshape, UpSampling2D, InputLayer
 from keras import backend as K
@@ -19,10 +20,12 @@ import matplotlib.pyplot as plt
 from cv2 import cvtColor, COLOR_BGR2RGB
 import keras.utils as image
 from math import sqrt
+import numpy as np
+import pandas as pd
 
 
 
-class AutoEncoders(Model):
+class NeuralNetwork(Model):
     """
     Parameters
     ----------
@@ -65,28 +68,25 @@ class AutoEncoders(Model):
         plt.show()
         return result
     
-    def flatten(self, image):
-        flatImg = array(image).flatten()
-        return flatImg.reshape(-1,len(flatImg))
-        
-    def reverseFlatten(self, image):
-        return image.reshape(self.inputShape[0],self.inputShape[1],self.inputShape[2])     
     
     
     def printInfos(self):
+        print(f"Input shape: {self.inputShape}")
         print(self.model.summary())
         
-    def saveModel(self,path):
+    def saveModel(self,path, history, overwrite=False):
         # serialize model to JSON
         model_json = self.model.to_json()
         iterator = 1
-        while(exists(path + str(iterator) + ".json")):
-            iterator+=1
+        if not overwrite:
+            while(exists(path + str(iterator) + ".json")):
+                iterator+=1
         with open(path + str(iterator) + ".json", "w") as json_file:
             json_file.write(model_json)
         # serialize weights to HDF5
         self.model.save_weights(path + str(iterator) + ".h5")
-        print("Saved model to disk")
+        history.to_csv(path + str(iterator) + ".csv")
+        print("Saved model to " + path + str(iterator))
         
     def loadModel(self, path):    
         #Load a model
@@ -100,13 +100,16 @@ class AutoEncoders(Model):
         print("Loaded model from disk")
         self.model = loadedModel
         
+        history = pd.read_csv(path + ".csv")
+        return history
+        
 
         
 
-class ConvolutionalAutoEncoders(AutoEncoders):
+class ConvolutionalAutoEncoders(NeuralNetwork):
     def __init__(self, inputShape = (28,28,3)):
         super().__init__()
-        AutoEncoders.__init__(self, inputShape)
+        NeuralNetwork.__init__(self, inputShape)
         
         self.model = Sequential()
         #Encoder
@@ -125,10 +128,10 @@ class ConvolutionalAutoEncoders(AutoEncoders):
         self.model.add(Conv2D(self.inputShape[-1],3,activation='sigmoid',padding='same'))  
 
 
-class AE(AutoEncoders):
+class AE(NeuralNetwork):
     def __init__(self, inputShape = (28,28,3)):
         super().__init__()
-        AutoEncoders.__init__(self, inputShape)
+        NeuralNetwork.__init__(self, inputShape)
         
         dropout=0.2
         self.model = Sequential()
@@ -140,23 +143,68 @@ class AE(AutoEncoders):
         
         self.model.add(Dense(512, activation='relu'))
         self.model.add(Dropout(dropout))
-        self.model.add(Dense(256, activation='relu'))
+        self.model.add(Dense(128, activation='relu'))
         self.model.add(Dropout(dropout))
-        self.model.add(Dense(64, activation='relu'))
-        self.model.add(Dropout(dropout))
+
         
         #Decoder
-        self.model.add(Dense(256, activation='relu'))
-        self.model.add(Dropout(dropout))
         self.model.add(Dense(512, activation='relu'))
         self.model.add(Dropout(dropout))
         
         # self.model.add(Dense(prod(inputShape), activation='relu'))
         # self.model.add(Reshape(inputShape))        
-        self.model.add(Dense(prod(inputShape)))
+        self.model.add(Dense(prod(inputShape), activation='sigmoid'))
         
-
-
+class AECNN(NeuralNetwork):
+    def __init__(self, inputShape = (28,28,3)):
+        super().__init__()
+        NeuralNetwork.__init__(self, inputShape)
+        
+        dropout=0.2
+        self.model = Sequential()
+        
+        #CNN encoder
+        self.model.add(Conv2D(30,3,activation='relu',padding='same', input_shape=inputShape))
+        self.model.add(MaxPooling2D(2,padding='same'))
+        self.model.add(Conv2D(15,3,activation='relu',padding='same'))
+        self.model.add(MaxPooling2D(2,padding='same'))
+        self.model.add(Conv2D(7,3,activation='relu',padding='same'))
+        self.model.add(MaxPooling2D(2,padding='same'))
+        
+        #Flatten
+        shape = self.model.output_shape
+        shapeFlat = np.prod(shape[1:])
+        self.model.add(Flatten())
+        
+        
+        #Encoder
+        self.model.add(Dense(shapeFlat, activation='relu'))
+        self.model.add(Dropout(dropout))
+        self.model.add(Dense(516, activation='relu'))
+        self.model.add(Dropout(dropout))
+        self.model.add(Dense(64, activation='relu'))
+        self.model.add(Dropout(dropout))
+        
+        #Decoder
+        self.model.add(Dense(516, activation='relu'))
+        self.model.add(Dropout(dropout))
+        self.model.add(Dense(shapeFlat, activation='relu'))
+        self.model.add(Dropout(dropout))
+        
+        #CNN decoder
+        self.model.add(Reshape(shape[1:])) 
+        
+        self.model.add(Conv2D(7,3,activation='relu',padding='same'))
+        self.model.add(UpSampling2D(2))
+        self.model.add(Conv2D(15,3,activation='relu',padding='same'))
+        self.model.add(UpSampling2D(2))
+        self.model.add(Conv2D(30,3,activation='relu',padding='same'))
+        self.model.add(UpSampling2D(2))
+        
+        #Output
+        self.model.add(Conv2D(self.inputShape[-1],3,activation='sigmoid',padding='same'))  
+        
+    
 def score(target,prediction):
     score = 0
     for i in range(len(target)):
@@ -165,30 +213,31 @@ def score(target,prediction):
     return score
 
 
-# a = AutoEncoders([28,28])
-# a.build()
-
-# from keras.datasets import mnist
-# import numpy as np
-# (x_train, _), (x_test, _) = mnist.load_data()
-
-# x_train = x_train.astype('float32') / 255.
-# x_test = x_test.astype('float32') / 255.
-# x_train = np.reshape(x_train, (len(x_train), 28, 28, 1))
-# x_test = np.reshape(x_test, (len(x_test), 28, 28, 1))
-# print(x_train.shape)
-# print(x_test.shape)
-
-
-# a.fit(x_train,x_test,epochs=15)
-# a.printInfos()
-
-# # Encode and decode some digits
-# # Note that we take them from the *test* set
-# img = a.predict(x_test)
-# a.plotPrediction(x_test, img)
-
-
+if __name__ == "__main__":
+    a = NeuralNetwork([28,28])
+    a.build()
+    
+    from keras.datasets import mnist
+    import numpy as np
+    (x_train, _), (x_test, _) = mnist.load_data()
+    
+    x_train = x_train.astype('float32') / 255.
+    x_test = x_test.astype('float32') / 255.
+    x_train = np.reshape(x_train, (len(x_train), 28, 28, 1))
+    x_test = np.reshape(x_test, (len(x_test), 28, 28, 1))
+    print(x_train.shape)
+    print(x_test.shape)
+    
+    
+    a.fit(x_train,x_test,epochs=15)
+    a.printInfos()
+    
+    # Encode and decode some digits
+    # Note that we take them from the *test* set
+    img = a.predict(x_test)
+    a.plotPrediction(x_test, img)
+    
+    
 
 
 
