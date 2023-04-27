@@ -112,18 +112,29 @@ class ConvolutionalAutoEncoders(NeuralNetwork):
         NeuralNetwork.__init__(self, inputShape)
         
         self.modelName = "CNN auto-encoders"
+        dropout=0.25
         
         self.model = Sequential()
         #Encoder
-        self.model.add(Conv2D(30,3,activation='relu',padding='same', input_shape=inputShape))
+        self.model.add(Conv2D(8,5,activation='relu',padding='same', input_shape=inputShape))
         self.model.add(MaxPooling2D(2,padding='same'))
-        self.model.add(Conv2D(15,3,activation='relu',padding='same'))
+        self.model.add(Dropout(dropout))
+        self.model.add(Conv2D(8,5,activation='relu',padding='same'))
         self.model.add(MaxPooling2D(2,padding='same'))
+        self.model.add(Dropout(dropout))
+        self.model.add(Conv2D(8,5,activation='relu',padding='same'))
+        self.model.add(MaxPooling2D(2,padding='same'))
+        self.model.add(Dropout(dropout))
+
         
         #Decoder
-        self.model.add(Conv2D(15,3,activation='relu',padding='same'))
+        self.model.add(Conv2D(8,5,activation='relu',padding='same'))
         self.model.add(UpSampling2D(2))
-        self.model.add(Conv2D(30,3,activation='relu',padding='same'))
+        self.model.add(Dropout(dropout))
+        self.model.add(Conv2D(8,5,activation='relu',padding='same'))
+        self.model.add(UpSampling2D(2))
+        self.model.add(Dropout(dropout))
+        self.model.add(Conv2D(8,5,activation='relu',padding='same'))
         self.model.add(UpSampling2D(2))
         
         #Output
@@ -196,19 +207,15 @@ class AECNN(NeuralNetwork):
         #Encoder
         self.model.add(Dense(shapeFlat, activation='relu'))
         self.model.add(Dropout(dropout))
-        self.model.add(Dense(512, activation='relu'))
-        self.model.add(Dropout(dropout))
-        self.model.add(Dense(512, activation='relu'))
-        self.model.add(Dropout(dropout))
+        #self.model.add(Dense(512, activation='relu'))
+        #self.model.add(Dropout(dropout))
         
         self.model.add(Dense(258, activation='relu'))
         self.model.add(Dropout(dropout))
         
         #Decoder
-        self.model.add(Dense(512, activation='relu'))
-        self.model.add(Dropout(dropout))
-        self.model.add(Dense(512, activation='relu'))
-        self.model.add(Dropout(dropout))
+        #self.model.add(Dense(512, activation='relu'))
+        #self.model.add(Dropout(dropout))
         self.model.add(Dense(shapeFlat, activation='relu'))
         self.model.add(Dropout(dropout))
         

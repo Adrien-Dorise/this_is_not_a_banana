@@ -14,6 +14,7 @@ import numpy as np
 import cv2
 import transferLearning as tl
 import keras.metrics as metrics
+from sklearn.utils import shuffle
 
 #Dynamic memory
 # from tensorflow.compat.v1 import ConfigProto
@@ -30,13 +31,13 @@ ySize = 224
 colorMode = 'rgb' #'rgb', 'monochrome'
 flatInput = False
 
-epoch = 500
-batch_size = 64
+epoch = 1000
+batch_size = 32
 optimizer = 'adam' #https://www.tensorflow.org/api_docs/python/tf/keras/optimizers
-loss = 'mae' #https://www.tensorflow.org/api_docs/python/tf/keras/losses
+loss = 'mse' #https://www.tensorflow.org/api_docs/python/tf/keras/losses
 learningRate = 0.0001
 
-trainFolder = 'OIDv4_ToolKit/OID/Dataset/train'
+trainFolder = 'OIDv4_ToolKit/OID/Dataset/debug'
 testFolder = 'OIDv4_ToolKit/OID/Dataset/test'
 validationFolder = 'OIDv4_ToolKit/OID/Dataset/validation'
 
@@ -49,6 +50,8 @@ if(colorMode == 'rgb'):
     inputShape = (xSize,ySize,3)
 else:
     inputShape = (xSize,ySize,1)
+
+model = nn.AECNN(inputShape)
 
 
 #!!!!!IMAGE PROCESSING!!!!!
@@ -71,23 +74,28 @@ test2D, test_flat = pr.loadFolder(testFolder + "/Banana", inputShape)
 print(f"Data info: train: {train2D.shape[0]} / validation: {validation2D.shape[0]}/ test: {test2D.shape[0]}")
 
 if not flatInput:
-    train = train2D
+    train = shuffle(train2D)
     validation = validation2D
     test = test2D
 else:
-    train = train_flat
+    train = shuffle(train_flat)
     validation = validation_flat
     test = test_flat
     
 
 #!!!!!TRAINING!!!!!
 if not resumeTraining:
-    model, history = pr.trainNew(train, validation, inputShape, optimizer, loss, learningRate, epoch, batch_size)
-else:
+    model, history = pr.trainNew(model, train, validation, optimizer, loss, learningRate, epoch, batch_size)
+else:    
+    model.loadModel("models/temp1")
+    model.build(optimizer = optimizer, loss = loss, lr = learningRate)
     model, history = pr.resumeTraining(model, history, train, validation, learningRate, epoch, batch_size)
 
 saveFile = 'models/AE'
 model.saveModel(saveFile, history, overwrite=False)
+model.saveModel('models/temp', history, overwrite=True)
+
+
 
 # model = nn.AECNN(inputShape)
 # model.build(optimizer = optimizer, loss = loss, lr = learningRate)
