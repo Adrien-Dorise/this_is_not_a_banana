@@ -6,11 +6,14 @@ Credit: Law Tech Productions, Adrien Dorise
 February 2023
 """
 
+import sys
+sys.path.append("scripts/")
 import processing as pr
 import neuralNetwork as nn
 import numpy as np
 import cv2
 import transferLearning as tl
+import keras.metrics as metrics
 
 #Dynamic memory
 # from tensorflow.compat.v1 import ConfigProto
@@ -22,16 +25,16 @@ import transferLearning as tl
 
 
 #Parameters
-xSize = 128
-ySize = 128
+xSize = 224
+ySize = 224
 colorMode = 'rgb' #'rgb', 'monochrome'
-flatInput = True
+flatInput = False
 
-epoch = 5000
-batch_size = 16
+epoch = 500
+batch_size = 64
 optimizer = 'adam' #https://www.tensorflow.org/api_docs/python/tf/keras/optimizers
-loss = 'msle' #https://www.tensorflow.org/api_docs/python/tf/keras/losses
-learningRate = 0.001
+loss = 'mae' #https://www.tensorflow.org/api_docs/python/tf/keras/losses
+learningRate = 0.0001
 
 trainFolder = 'OIDv4_ToolKit/OID/Dataset/train'
 testFolder = 'OIDv4_ToolKit/OID/Dataset/test'

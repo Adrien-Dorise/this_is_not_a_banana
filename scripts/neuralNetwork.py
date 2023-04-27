@@ -173,15 +173,19 @@ class AECNN(NeuralNetwork):
         self.model = Sequential()
         
         #CNN encoder
-        self.model.add(Conv2D(30,3,activation='relu',padding='same', input_shape=inputShape))
+        self.model.add(Conv2D(8,5,activation='relu',padding='same', input_shape=inputShape))
         self.model.add(MaxPooling2D(2,padding='same'))
         self.model.add(Dropout(dropout))
-        self.model.add(Conv2D(15,3,activation='relu',padding='same'))
+        self.model.add(Conv2D(8,5,activation='relu',padding='same'))
         self.model.add(MaxPooling2D(2,padding='same'))
         self.model.add(Dropout(dropout))
-        self.model.add(Conv2D(7,3,activation='relu',padding='same'))
+        self.model.add(Conv2D(8,5,activation='relu',padding='same'))
         self.model.add(MaxPooling2D(2,padding='same'))
         self.model.add(Dropout(dropout))
+        self.model.add(Conv2D(8,5,activation='relu',padding='same'))
+        self.model.add(MaxPooling2D(2,padding='same'))
+        self.model.add(Dropout(dropout))
+
         
         #Flatten
         shape = self.model.output_shape
@@ -192,13 +196,18 @@ class AECNN(NeuralNetwork):
         #Encoder
         self.model.add(Dense(shapeFlat, activation='relu'))
         self.model.add(Dropout(dropout))
-        self.model.add(Dense(516, activation='relu'))
+        self.model.add(Dense(512, activation='relu'))
         self.model.add(Dropout(dropout))
+        self.model.add(Dense(512, activation='relu'))
+        self.model.add(Dropout(dropout))
+        
         self.model.add(Dense(258, activation='relu'))
         self.model.add(Dropout(dropout))
         
         #Decoder
-        self.model.add(Dense(516, activation='relu'))
+        self.model.add(Dense(512, activation='relu'))
+        self.model.add(Dropout(dropout))
+        self.model.add(Dense(512, activation='relu'))
         self.model.add(Dropout(dropout))
         self.model.add(Dense(shapeFlat, activation='relu'))
         self.model.add(Dropout(dropout))
@@ -206,15 +215,18 @@ class AECNN(NeuralNetwork):
         #CNN decoder
         self.model.add(Reshape(shape[1:])) 
         
-        self.model.add(Conv2D(7,3,activation='relu',padding='same'))
+        self.model.add(Conv2D(8,5,activation='relu',padding='same'))
         self.model.add(UpSampling2D(2))
         self.model.add(Dropout(dropout))
-        self.model.add(Conv2D(15,3,activation='relu',padding='same'))
+        self.model.add(Conv2D(8,5,activation='relu',padding='same'))
         self.model.add(UpSampling2D(2))
         self.model.add(Dropout(dropout))
-        self.model.add(Conv2D(30,3,activation='relu',padding='same'))
+        self.model.add(Conv2D(8,5,activation='relu',padding='same'))
         self.model.add(UpSampling2D(2))
         self.model.add(Dropout(dropout))
+        self.model.add(Conv2D(8,5,activation='relu',padding='same'))
+        self.model.add(UpSampling2D(2))
+
         
         #Output
         self.model.add(Conv2D(self.inputShape[-1],3,activation=None,padding='same'))  

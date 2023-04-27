@@ -93,7 +93,7 @@ def plotTraining(title,history):
     
 def trainNew(trainSet, validSet, inputShape, optimizer, loss, lr, epoch, batch_size):
     history_pd = pd.DataFrame()
-    model = nn.AE(inputShape)
+    model = nn.AECNN(inputShape)
     model.printInfos()
     model.build(optimizer = optimizer, loss = loss, lr = lr)
     history = model.fit(trainSet,validSet,epochs=epoch, batch_size = batch_size)
