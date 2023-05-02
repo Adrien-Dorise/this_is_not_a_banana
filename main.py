@@ -12,6 +12,7 @@ import processing as pr
 import neuralNetwork as nn
 import numpy as np
 import cv2
+import pandas as pd
 import transferLearning as tl
 import keras.metrics as metrics
 from sklearn.utils import shuffle
@@ -27,7 +28,7 @@ from sklearn.utils import shuffle
 
 #Parameters
 xSize = 224
-ySize = 224
+ySize = xSize
 colorMode = 'rgb' #'rgb', 'monochrome'
 flatInput = False
 
@@ -35,13 +36,13 @@ epoch = 1000
 batch_size = 32
 optimizer = 'adam' #https://www.tensorflow.org/api_docs/python/tf/keras/optimizers
 loss = 'mse' #https://www.tensorflow.org/api_docs/python/tf/keras/losses
-learningRate = 0.0001
+learningRate = 0.00001
 
-trainFolder = 'OIDv4_ToolKit/OID/Dataset/debug'
+trainFolder = 'OIDv4_ToolKit/OID/Dataset/train'
 testFolder = 'OIDv4_ToolKit/OID/Dataset/test'
 validationFolder = 'OIDv4_ToolKit/OID/Dataset/validation'
 
-resumeTraining = False
+resumeTraining = True
 
 
 
@@ -51,7 +52,10 @@ if(colorMode == 'rgb'):
 else:
     inputShape = (xSize,ySize,1)
 
-model = nn.AECNN(inputShape)
+model = nn.ConvolutionalAutoEncoders2(inputShape)
+
+
+
 
 
 #!!!!!IMAGE PROCESSING!!!!!
@@ -88,6 +92,7 @@ if not resumeTraining:
     model, history = pr.trainNew(model, train, validation, optimizer, loss, learningRate, epoch, batch_size)
 else:    
     model.loadModel("models/temp1")
+    history = pd.DataFrame()
     model.build(optimizer = optimizer, loss = loss, lr = learningRate)
     model, history = pr.resumeTraining(model, history, train, validation, learningRate, epoch, batch_size)
 
@@ -109,7 +114,7 @@ model.saveModel('models/temp', history, overwrite=True)
 #!!!!!TESTING!!!!!
 print("Plot")
 
-fileTest = 'OIDv4_ToolKit/OID/Dataset/train/Banana/06a804f6a15ce815.jpg'
+fileTest = 'OIDv4_ToolKit/OID/Dataset/train/Banana/7a270f199e78c912.jpg'
 pr.testModel(model, fileTest, inputShape, flatInput)
 # modeltl.predict(fileTest)
 

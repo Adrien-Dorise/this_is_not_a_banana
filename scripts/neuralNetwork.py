@@ -14,7 +14,7 @@ from numpy import array, prod
 from keras.models import model_from_json
 from tensorflow import squeeze
 from keras import Sequential, Model, Input
-from keras.layers import Dense, Dropout, Flatten, Conv2D, MaxPooling2D, Reshape, UpSampling2D, InputLayer
+from keras.layers import Dense, Dropout, Flatten, Conv2D, Conv2DTranspose, MaxPooling2D, AveragePooling2D, Reshape, UpSampling2D, InputLayer
 from keras import backend as K
 import matplotlib.pyplot as plt
 from cv2 import cvtColor, COLOR_BGR2RGB
@@ -112,18 +112,24 @@ class ConvolutionalAutoEncoders(NeuralNetwork):
         NeuralNetwork.__init__(self, inputShape)
         
         self.modelName = "CNN auto-encoders"
-        dropout=0.25
+        dropout=0.2
         
         self.model = Sequential()
         #Encoder
         self.model.add(Conv2D(8,5,activation='relu',padding='same', input_shape=inputShape))
-        self.model.add(MaxPooling2D(2,padding='same'))
+        self.model.add(AveragePooling2D(2,padding='same'))
         self.model.add(Dropout(dropout))
         self.model.add(Conv2D(8,5,activation='relu',padding='same'))
-        self.model.add(MaxPooling2D(2,padding='same'))
+        self.model.add(AveragePooling2D(2,padding='same'))
         self.model.add(Dropout(dropout))
         self.model.add(Conv2D(8,5,activation='relu',padding='same'))
-        self.model.add(MaxPooling2D(2,padding='same'))
+        self.model.add(AveragePooling2D(2,padding='same'))
+        self.model.add(Dropout(dropout))
+        self.model.add(Conv2D(8,5,activation='relu',padding='same'))
+        self.model.add(AveragePooling2D(2,padding='same'))
+        self.model.add(Dropout(dropout))
+        self.model.add(Conv2D(8,5,activation='relu',padding='same'))
+        self.model.add(AveragePooling2D(2,padding='same'))
         self.model.add(Dropout(dropout))
 
         
@@ -136,10 +142,62 @@ class ConvolutionalAutoEncoders(NeuralNetwork):
         self.model.add(Dropout(dropout))
         self.model.add(Conv2D(8,5,activation='relu',padding='same'))
         self.model.add(UpSampling2D(2))
+        self.model.add(Dropout(dropout))
+        self.model.add(Conv2D(8,5,activation='relu',padding='same'))
+        self.model.add(UpSampling2D(2))
+        self.model.add(Dropout(dropout))
+        self.model.add(Conv2D(8,5,activation='relu',padding='same'))
+        self.model.add(UpSampling2D(2))
         
         #Output
         self.model.add(Conv2D(self.inputShape[-1],3,activation='sigmoid',padding='same'))  
 
+
+class ConvolutionalAutoEncoders2(NeuralNetwork):
+    def __init__(self, inputShape = (28,28,3)):
+        super().__init__()
+        NeuralNetwork.__init__(self, inputShape)
+        
+        self.modelName = "CNN auto-encoders v2"
+        dropout=0.2
+        
+        self.model = Sequential()
+        
+        self.model.add(Conv2D(64, (2, 2), strides = 1, padding = 'same', input_shape = inputShape))
+        self.model.add(MaxPooling2D(2,padding='same'))
+        self.model.add(Dropout(dropout))
+        self.model.add(Conv2D(32, (2, 2), strides = 1, padding = 'same'))
+        self.model.add(MaxPooling2D(2,padding='same'))
+        self.model.add(Dropout(dropout))
+        self.model.add(Conv2D(16, (2, 2), strides = 1, padding = 'same'))
+        self.model.add(MaxPooling2D(2,padding='same'))
+        self.model.add(Dropout(dropout))
+        
+        #latent
+        #self.model.add(Conv2D(8, (2, 2), strides = 1, padding = 'same'))
+        #self.model.add(Dropout(dropout))
+        
+        #Flatten
+        shape = self.model.output_shape
+        shapeFlat = np.prod(shape[1:])
+        self.model.add(Flatten())
+        
+        self.model.add(Dense(shapeFlat, activation='relu'))
+
+        #CNN decoder
+        self.model.add(Reshape(shape[1:])) 
+        
+        #decode
+        self.model.add(Conv2DTranspose(16, (2, 2), strides = 1, padding = 'same'))
+        self.model.add(UpSampling2D(2))
+        self.model.add(Dropout(dropout))
+        self.model.add(Conv2DTranspose(32, (2, 2), strides = 1, padding = 'same'))
+        self.model.add(UpSampling2D(2))
+        self.model.add(Dropout(dropout))
+        self.model.add(Conv2DTranspose(64, (2, 2), strides = 1, padding = 'same'))
+        self.model.add(UpSampling2D(2))
+    
+        self.model.add(Conv2DTranspose(3, (1, 1), strides = 1, activation = 'sigmoid', padding = 'same'))
 
 class AE(NeuralNetwork):
     def __init__(self, inputShape = (28,28,3)):
