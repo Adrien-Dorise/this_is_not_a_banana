@@ -17,6 +17,7 @@ import transferLearning as tl
 import keras.metrics as metrics
 from sklearn.utils import shuffle
 
+
 #Dynamic memory
 # from tensorflow.compat.v1 import ConfigProto
 # from tensorflow.compat.v1 import InteractiveSession
@@ -27,22 +28,22 @@ from sklearn.utils import shuffle
 
 
 #Parameters
-xSize = 224
+xSize = 256
 ySize = xSize
 colorMode = 'rgb' #'rgb', 'monochrome'
 flatInput = False
 
-epoch = 1000
+epoch = 50
 batch_size = 32
 optimizer = 'adam' #https://www.tensorflow.org/api_docs/python/tf/keras/optimizers
-loss = 'mse' #https://www.tensorflow.org/api_docs/python/tf/keras/losses
-learningRate = 0.00001
+loss = 'binary_crossentropy' #https://www.tensorflow.org/api_docs/python/tf/keras/losses
+learningRate = 0.001
 
 trainFolder = 'OIDv4_ToolKit/OID/Dataset/train'
 testFolder = 'OIDv4_ToolKit/OID/Dataset/test'
 validationFolder = 'OIDv4_ToolKit/OID/Dataset/validation'
 
-resumeTraining = True
+resumeTraining = False
 
 
 
@@ -52,10 +53,10 @@ if(colorMode == 'rgb'):
 else:
     inputShape = (xSize,ySize,1)
 
-model = nn.ConvolutionalAutoEncoders2(inputShape)
+model = nn.VAECNN(inputShape)
 
-
-
+if(model.modelName == "VAECNN"):
+    loss = nn.loss_vae3
 
 
 #!!!!!IMAGE PROCESSING!!!!!
@@ -91,14 +92,14 @@ else:
 if not resumeTraining:
     model, history = pr.trainNew(model, train, validation, optimizer, loss, learningRate, epoch, batch_size)
 else:    
-    model.loadModel("models/temp1")
-    history = pd.DataFrame()
+    history = model.load_weights("models/temp1")
     model.build(optimizer = optimizer, loss = loss, lr = learningRate)
     model, history = pr.resumeTraining(model, history, train, validation, learningRate, epoch, batch_size)
 
-saveFile = 'models/AE'
-model.saveModel(saveFile, history, overwrite=False)
-model.saveModel('models/temp', history, overwrite=True)
+saveFile = 'models/' + model.name
+model.save_weights(saveFile, history, overwrite=False)
+model.save_weights('models/temp', history, overwrite=True)
+
 
 
 
@@ -113,41 +114,54 @@ model.saveModel('models/temp', history, overwrite=True)
 
 #!!!!!TESTING!!!!!
 print("Plot")
+#model.load_weights("models/temp1")
 
+print("\nbanana train")
 fileTest = 'OIDv4_ToolKit/OID/Dataset/train/Banana/7a270f199e78c912.jpg'
 pr.testModel(model, fileTest, inputShape, flatInput)
 # modeltl.predict(fileTest)
 
+print("\npear-banana test")
 fileTest = 'OIDv4_ToolKit/OID/Dataset/test/Banana/eeb93d366d6c69e7.jpg'
 pr.testModel(model, fileTest, inputShape, flatInput)
 # modeltl.predict(fileTest)
 
+print("\nmeme")
 fileTest = 'OIDv4_ToolKit/OID/Dataset/test/Banana/694f86.jpg'
 pr.testModel(model, fileTest, inputShape, flatInput)
 # modeltl.predict(fileTest)
 
+print("\ncar")
 fileTest = 'Dataset_example/test/voiture.jpg'
 pr.testModel(model, fileTest, inputShape, flatInput)
 # modeltl.predict(fileTest)
 
+print("\nbanana plate test")
 fileTest = 'Dataset_example/test/Cavendish-Banana-s.jpg'
 pr.testModel(model, fileTest, inputShape, flatInput)
 # modeltl.predict(fileTest)
 
+print("\ncontroller")
 fileTest = 'Dataset_example/test/controller.jpg'
 pr.testModel(model, fileTest, inputShape, flatInput)
 # modeltl.predict(fileTest)
 
+print("\nmug")
 fileTest = 'Dataset_example/test/tass.jpg'
 pr.testModel(model, fileTest, inputShape, flatInput)
 # modeltl.predict(fileTest)
 
+print("\nbanana train")
 fileTest = 'Dataset_example/train/00ac03de349a3c5b.jpg'
 pr.testModel(model, fileTest, inputShape, flatInput)
 # modeltl.predict(fileTest)
 
+print("\nbanana train")
 fileTest = 'Dataset_example/train/00d843af60eecf7c.jpg'
 pr.testModel(model, fileTest, inputShape, flatInput)
 # modeltl.predict(fileTest)
 
 
+from numba import cuda
+cuda.select_device(0)
+cuda.close()
