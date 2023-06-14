@@ -93,8 +93,8 @@ def plotTraining(title,history):
     
 def trainNew(model,trainSet, validSet, optimizer, loss, lr, epoch, batch_size):
     history_pd = pd.DataFrame()
-    model.printInfos()
     model.build(optimizer = optimizer, loss = loss, lr = lr)
+    model.printInfos()
     history = model.fit(trainSet,validSet,epochs=epoch, batch_size = batch_size)
     history_pd = history_pd.append(pd.DataFrame(history.history), ignore_index=True)
     plotTraining(model.modelName, history_pd)

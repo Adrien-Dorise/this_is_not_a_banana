@@ -28,12 +28,12 @@ from sklearn.utils import shuffle
 
 
 #Parameters
-xSize = 256
+xSize = 128
 ySize = xSize
 colorMode = 'rgb' #'rgb', 'monochrome'
 flatInput = False
 
-epoch = 50
+epoch = 250
 batch_size = 32
 optimizer = 'adam' #https://www.tensorflow.org/api_docs/python/tf/keras/optimizers
 loss = 'binary_crossentropy' #https://www.tensorflow.org/api_docs/python/tf/keras/losses
@@ -55,8 +55,8 @@ else:
 
 model = nn.VAECNN(inputShape)
 
-if(model.modelName == "VAECNN"):
-    loss = nn.loss_vae3
+#if(model.modelName == "VAECNN"):
+#    loss = None
 
 
 #!!!!!IMAGE PROCESSING!!!!!
@@ -86,7 +86,9 @@ else:
     train = shuffle(train_flat)
     validation = validation_flat
     test = test_flat
-    
+
+
+
 
 #!!!!!TRAINING!!!!!
 if not resumeTraining:
@@ -160,6 +162,35 @@ print("\nbanana train")
 fileTest = 'Dataset_example/train/00d843af60eecf7c.jpg'
 pr.testModel(model, fileTest, inputShape, flatInput)
 # modeltl.predict(fileTest)
+
+
+
+import matplotlib.pyplot as plt
+
+
+def plot_latent_space(vae, n=1, figsize=15):
+    # display a n*n 2D manifold of digits
+    digit_size = 256
+    scale = 1.0
+    figure = np.zeros((digit_size * n, digit_size * n))
+    # linearly spaced coordinates corresponding to the 2D plot
+    # of digit classes in the latent space
+    grid_x = np.linspace(-scale, scale, n)
+    grid_y = np.linspace(-scale, scale, n)[::-1]
+
+    for i, yi in enumerate(grid_y):
+        for j, xi in enumerate(grid_x):
+            z_sample = np.array([[xi, yi]])
+            x_latent = vae.latent.predict(z_sample)
+            x_decoded = vae.decoder.predict(x_latent)
+            digit = x_decoded[0].reshape(digit_size, digit_size,3)
+
+    plt.imshow(digit)
+    plt.show()
+
+
+plot_latent_space(model.model)
+
 
 
 from numba import cuda

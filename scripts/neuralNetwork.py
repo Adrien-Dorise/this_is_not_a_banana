@@ -12,11 +12,13 @@ February 2023
 from os.path import exists
 from numpy import array, prod
 from keras.models import model_from_json
-from tensorflow import squeeze
+import tensorflow as tf
 from keras import Sequential, Model, Input
 from keras import layers as layers 
 from keras import backend as K
+from keras import metrics as metrics
 import keras.losses as losses
+from keras.engine import data_adapter
 import matplotlib.pyplot as plt
 from cv2 import cvtColor, COLOR_BGR2RGB
 import keras.utils as image
@@ -53,6 +55,7 @@ class NeuralNetwork(Model):
                         batch_size=batch_size,
                         shuffle=True,
                         validation_data=(validationInput, validationInput))
+        
         return history
     
     def predict(self, testInput):
@@ -144,8 +147,110 @@ class NeuralNetwork(Model):
         print("Loaded model from disk")
         
         return history
-
+    
+    
+class VAE_MODEL(NeuralNetwork):
+   
+    def __init__(self, inputShape = (28,28,3)):
+        super().__init__()
+        NeuralNetwork.__init__(self, inputShape)
+        self.inputShape = inputShape
+        self.loss = losses.binary_crossentropy
         
+    class Sampling(layers.Layer):
+        """Uses (z_mean, z_log_var) to sample z, the vector encoding a digit."""
+
+        def call(self, inputs):
+           z_mean, z_log_var = inputs
+           batch = K.shape(z_mean)[0]
+           dim = K.shape(z_mean)[1]
+           epsilon = tf.random.normal(shape=(batch, dim))
+           return z_mean + K.exp(0.5 * z_log_var) * epsilon
+       
+    def loss_vae(self, inputs, outputs, z_mean, z_log_var, input_shape, loss):
+        reconstruction_loss = loss(K.flatten(inputs), K.flatten(outputs))
+        reconstruction_loss *= input_shape[0] * input_shape[1] * input_shape[2]
+        kl_loss = -0.5 * K.sum(1 + z_log_var - K.square(z_mean) - K.exp(z_log_var), axis=1)
+        B = 1000   
+        vae_loss = K.mean(B * reconstruction_loss + kl_loss)
+        return [vae_loss, reconstruction_loss, kl_loss]
+
+    def fit(self,trainInput,validationInput, epochs = 15, batch_size = 128):
+        history = self.model.fit(trainInput,None,
+                        epochs=epochs,
+                        batch_size=batch_size,
+                        validation_data=(validationInput, None))
+        return history
+
+
+    def build(self, optimizer='adam', loss='binary_crossentropy', lr = 0.001):
+        if loss == 'binary_crossentropy':
+            self.loss = losses.binary_crossentropy
+        elif loss == 'mae':
+            self.loss = losses.mae
+        elif loss == 'mse':
+            self.loss = losses.mse
+        self.model.compile(optimizer=optimizer)
+        self.model.optimizer.learning_rate = lr
+        
+        
+        
+class VAE_LAYER(Model):
+   
+    def __init__(self, encoder, latent, decoder, **kwargs):
+        super().__init__(**kwargs)
+        self.encoder = encoder
+        self.latent = latent
+        self.decoder = decoder
+        self.total_loss_tracker = metrics.Mean(name="loss")
+        self.reconstruction_loss_tracker = metrics.Mean(
+            name="reconstruction_loss"
+        )
+        self.kl_loss_tracker = metrics.Mean(name="kl_loss")
+        
+    
+    
+    def call(self, inputs):
+        z_mean, z_log_var, z = self.encoder(inputs)
+        latent_output = self.latent(z)
+        reconstruction = self.decoder(latent_output)
+        return reconstruction
+    
+    @property
+    #https://keras.io/examples/generative/vae/
+    def metrics(self):
+        return [
+            self.total_loss_tracker,
+            self.reconstruction_loss_tracker,
+            self.kl_loss_tracker,
+        ]    
+    
+    def train_step(self, data):
+        x, y, sample_weight = data_adapter.unpack_x_y_sample_weight(data)
+        with tf.GradientTape() as tape:
+            z_mean, z_log_var, z = self.encoder(data)
+            reconstruction = self.latent(z)
+            reconstruction = self.decoder(reconstruction)
+            reconstruction_loss = tf.reduce_mean(
+                tf.reduce_sum(
+                    losses.binary_crossentropy(data, reconstruction), axis=(1, 2)
+                )
+            )
+            kl_loss = -0.5 * (1 + z_log_var - K.square(z_mean) - K.exp(z_log_var))
+            kl_loss = tf.reduce_mean(tf.reduce_sum(kl_loss, axis=1))
+            total_loss = reconstruction_loss + kl_loss
+        grads = tape.gradient(total_loss, self.trainable_weights)
+        self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
+        self.total_loss_tracker.update_state(total_loss)
+        self.reconstruction_loss_tracker.update_state(reconstruction_loss)
+        self.kl_loss_tracker.update_state(kl_loss)
+        return {
+            "loss": self.total_loss_tracker.result(),
+            "reconstruction_loss": self.reconstruction_loss_tracker.result(),
+            "kl_loss": self.kl_loss_tracker.result(),
+        }
+
+
 
 class ConvolutionalAutoEncoders(NeuralNetwork):
     def __init__(self, inputShape = (28,28,3)):
@@ -238,7 +343,7 @@ class ConvolutionalAutoEncoders2(NeuralNetwork):
         self.model.add(layers.Conv2DTranspose(64, (2, 2), strides = 1, padding = 'same'))
         self.model.add(layers.UpSampling2D(2))
     
-        self.model.add(layers.Conv2DTranspose(3, (1, 1), strides = 1, activation = 'sigmoid', padding = 'same'))
+        self.model.add(layers.Conv2DTranspose(self.inputShape[-1], (1, 1), strides = 1, activation = 'sigmoid', padding = 'same'))
         
 class ConvolutionalAutoEncoders3(NeuralNetwork):
     def __init__(self, inputShape = (28,28,3)):
@@ -306,7 +411,7 @@ class ConvolutionalAutoEncoders3(NeuralNetwork):
         self.model.add(layers.BatchNormalization())
         self.model.add(layers.ReLU())
     
-        self.model.add(layers.Conv2DTranspose(3, (1, 1), strides = 1, activation='sigmoid', padding = 'same'))
+        self.model.add(layers.Conv2DTranspose(self.inputShape[-1], (1, 1), strides = 1, activation='sigmoid', padding = 'same'))
 
 class AE(NeuralNetwork):
     def __init__(self, inputShape = (28,28,3)):
@@ -404,16 +509,23 @@ class AECNN(NeuralNetwork):
         #Output
         self.model.add(layers.Conv2D(self.inputShape[-1],3,activation=None,padding='same'))  
         
-class VAECNN(NeuralNetwork):
+class VAECNN(VAE_MODEL):
     # https://blog.paperspace.com/how-to-build-variational-autoencoder-keras/
     def __init__(self, inputShape = (28,28,3)):
         super().__init__()
-        NeuralNetwork.__init__(self, inputShape)
+        VAE_MODEL.__init__(self, inputShape)
+        
         
         self.modelName = "VAECNN"
         dropout=0.2
         
+        #Loss metrics
+        self.total_loss_tracker = metrics.Mean(name="total_loss")
+        self.reconstruction_loss_tracker = metrics.Mean(name="reconstruction_loss")
+        self.kl_loss_tracker = metrics.Mean(name="kl_loss")
         
+        
+        #Encoder
         self.vae_input = Input(shape=inputShape, name="input_layer")
                 
         self.encoderCNN = Sequential()
@@ -427,12 +539,7 @@ class VAECNN(NeuralNetwork):
         self.encoderCNN.add(layers.BatchNormalization())
         self.encoderCNN.add(layers.ReLU())
         self.encoderCNN.add(layers.Dropout(dropout))
-        self.encoderCNN.add(layers.Conv2D(64, (2, 2), strides = 1, padding = 'same'))
-        self.encoderCNN.add(layers.MaxPooling2D(2,padding='same'))
-        self.encoderCNN.add(layers.BatchNormalization())
-        self.encoderCNN.add(layers.ReLU())
-        self.encoderCNN.add(layers.Dropout(dropout))
-        self.encoderCNN.add(layers.Conv2D(64, (2, 2), strides = 1, padding = 'same'))
+        self.encoderCNN.add(layers.Conv2D(128, (2, 2), strides = 1, padding = 'same'))
         self.encoderCNN.add(layers.MaxPooling2D(2,padding='same'))
         self.encoderCNN.add(layers.BatchNormalization())
         self.encoderCNN.add(layers.ReLU())
@@ -442,35 +549,32 @@ class VAECNN(NeuralNetwork):
         shape = self.encoderCNN.output_shape[1:]
         shapeFlat = np.prod(shape)
         self.encoderCNN.add(layers.Flatten())
+        #self.encoderCNN.add(layers.Dense(32, activation="relu"))
+        
         
         #Distribution calulcation space
         latent_space_dim = 2
         self.encoderCNN_output = self.encoderCNN(self.vae_input)
         self.encoder_mean = layers.Dense(units=latent_space_dim, name="encoder_mu")(self.encoderCNN_output)
         self.encoder_log_variance = layers.Dense(units=latent_space_dim, name="encoder_log_variance")(self.encoderCNN_output)
-        #self.encoder_mean, self.encoder_log_variance = self.KLDivergenceLayer()([self.encoder_mean, self.encoder_log_variance ])
-        self.encoder_distribution_output = layers.Lambda(self.sampling, name="encoder_output")([self.encoder_mean, self.encoder_log_variance])
+        self.encoder_distribution_output = self.Sampling()([self.encoder_mean, self.encoder_log_variance])
         
-        self.encoder = Model(self.vae_input, self.encoder_distribution_output, name='encoder_model')
+        self.encoder = Model(self.vae_input, [self.encoder_mean, self.encoder_log_variance, self.encoder_distribution_output], name='encoder_model')
+        
         
         #Latent layer
         self.input_latent = layers.Input(shape=(latent_space_dim,), name="latent_input")
         self.ouput_latent_dense1 = layers.Dense(shapeFlat, activation="relu")(self.input_latent)
-        self.latent = Model(self.input_latent, self.ouput_latent_dense1)
+        self.latent = Model(self.input_latent, self.ouput_latent_dense1, name="latent_space")
         
 
         
-        #decode
+        #Decoder
         self.decoder_input = Input(shape=(shapeFlat,), name="decoder_input")
 
         self.decoderCNN = Sequential()
-        self.decoderCNN.add(layers.Reshape(shape)) 
-        self.decoderCNN.add(layers.Conv2DTranspose(64, (2, 2), strides = 1, padding = 'same'))
-        self.decoderCNN.add(layers.UpSampling2D(2))
-        self.decoderCNN.add(layers.BatchNormalization())
-        self.decoderCNN.add(layers.ReLU())
-        self.decoderCNN.add(layers.Dropout(dropout))
-        self.decoderCNN.add(layers.Conv2DTranspose(64, (2, 2), strides = 1, padding = 'same'))
+        self.decoderCNN.add(layers.Reshape(shape))
+        self.decoderCNN.add(layers.Conv2DTranspose(128, (2, 2), strides = 1, padding = 'same'))
         self.decoderCNN.add(layers.UpSampling2D(2))
         self.decoderCNN.add(layers.BatchNormalization())
         self.decoderCNN.add(layers.ReLU())
@@ -485,85 +589,25 @@ class VAECNN(NeuralNetwork):
         self.decoderCNN.add(layers.BatchNormalization())
         self.decoderCNN.add(layers.ReLU())
     
-        self.decoderCNN.add(layers.Conv2DTranspose(3, (1, 1), strides = 1, activation = 'sigmoid', padding = 'same'))
+        self.decoderCNN.add(layers.Conv2DTranspose(self.inputShape[-1], (1, 1), strides = 1, activation = 'sigmoid', padding = 'same'))
         
         self.decoderOutput = self.decoderCNN(self.decoder_input)
         self.decoder = Model(self.decoder_input, self.decoderOutput, name = "decoder_model")
         
         #VAE model creation
         self.encoder_output = self.encoder(self.vae_input)
-        self.latent_output = self.latent(self.encoder_output)
+        self.latent_output = self.latent(self.encoder_output[2])
         self.vae_output = self.decoder(self.latent_output)
-        self.model = Model(self.vae_input, self.vae_output)
+        self.model = Model(self.vae_input, self.vae_output, name='VAE')
+
+        #self.model = VAE_MODEL(self.encoder, self.latent, self.decoder, name="VAE")
+        #self.model.build((None,self.inputShape[0],self.inputShape[1],self.inputShape[2]))
+
+        losses = self.loss_vae(self.vae_input, self.vae_output, self.encoder_mean, self.encoder_log_variance, self.inputShape, self.loss)
+        self.model.add_loss(losses[0])
+        self.model.add_metric(losses[1], name="kl_loss")
+        self.add_metric(losses[2], name="reconstruction_loss")
         
-    def sampling(self, mu_log_variance):
-        mu, log_variance = mu_log_variance
-        epsilon = K.random_normal(shape=K.shape(mu), mean=0.0, stddev=1.0)
-        random_sample = mu + K.exp(log_variance/2) * epsilon
-        return random_sample
-
-    def loss_vae(self, inputs, outputs):
-        reconstruction_loss = losses.binary_crossentropy(inputs, outputs)
-        img_dim = self.inputShape[0] * self.inputShape[1]
-        reconstruction_loss *= img_dim
-        kl_loss = 1 + self.encoder_log_variance - K.square(self.encoder_mean) - K.exp(self.encoder_log_variance)
-        kl_loss = K.sum(kl_loss, axis=-1)
-        kl_loss *= -0.5
-        vae_loss = K.mean(reconstruction_loss + kl_loss)
-        return vae_loss
-    
-    class KLDivergenceLayer(layers.Layer):
-
-        """ Identity transform layer that adds KL divergence
-        to the final model loss.
-        """
-    
-        def __init__(self, *args, **kwargs):
-            self.is_placeholder = True
-            super().__init__(*args, **kwargs)
-    
-        def call(self, inputs):
-    
-            mu, log_var = inputs
-    
-            kl_batch = - .5 * K.sum(1 + log_var -
-                                    K.square(mu) -
-                                    K.exp(log_var), axis=-1)
-    
-            self.add_loss(K.mean(kl_batch), inputs=inputs)
-            return inputs
-        
-
-def loss_vae2(encoder_mu, encoder_log_variance):
-    def vae_reconstruction_loss(y_true, y_predict):
-        reconstruction_loss_factor = 1000
-        reconstruction_loss = K.mean(K.square(y_true-y_predict), axis=[1, 2, 3])
-        return reconstruction_loss_factor * reconstruction_loss
-
-    def vae_kl_loss(encoder_mu, encoder_log_variance):
-        kl_loss = -0.5 * K.sum(1.0 + encoder_log_variance - K.square(encoder_mu) - K.exp(encoder_log_variance), axis=1)
-        return kl_loss
-
-    def vae_kl_loss_metric(y_true, y_predict):
-        kl_loss = -0.5 * K.sum(1.0 + encoder_log_variance - K.square(encoder_mu) - K.exp(encoder_log_variance), axis=1)
-        return kl_loss
-
-    def vae_loss(y_true, y_predict):
-        reconstruction_loss = vae_reconstruction_loss(y_true, y_predict)
-        kl_loss = vae_kl_loss(y_true, y_predict)
-        print(reconstruction_loss)
-        print(kl_loss)
-        loss = reconstruction_loss + kl_loss
-        return loss
-
-    return vae_loss
-
-def loss_vae3(y_true, y_pred):
-    """ Negative log likelihood (Bernoulli). """
-
-    # keras.losses.binary_crossentropy gives the mean
-    # over the last axis. we require the sum
-    return K.sum(K.binary_crossentropy(y_true, y_pred), axis=-1)
     
 
 
@@ -601,6 +645,7 @@ if __name__ == "__main__":
     img = a.predict(x_test)
     a.plotPrediction(x_test, img)
     
+
     
 
 
