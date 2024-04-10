@@ -10,44 +10,43 @@ import sys
 sys.path.append("scripts/")
 import processing as pr
 import neuralNetwork as nn
-import numpy as np
-import cv2
-import pandas as pd
-import transferLearning as tl
-import keras.metrics as metrics
 from sklearn.utils import shuffle
 
 
-#Dynamic memory
-# from tensorflow.compat.v1 import ConfigProto
-# from tensorflow.compat.v1 import InteractiveSession
-# config = ConfigProto()
-# config.gpu_options.allow_growth = True
-# session = InteractiveSession(config=config)
-# session.close()
+
+if __name__ == "__main__":
+	from dragonflai.config.ML_config import *
+	from dragonflai.config.NN_config import *
+	from dragonflai.config.data_config import *
+	from dragonflai.experiment import *
+
+ 
+	experiment = Experiment(NN_model,
+			train_path,
+			val_path,
+			test_path,
+			visu_path,
+			input_shape=input_shape,
+			num_epoch=num_epoch,
+			batch_size=batch_size,
+			learning_rate=lr,
+			weight_decay=wd,
+			optimizer=optimizer,
+			criterion=crit,
+			scaler=scaler,
+			nb_workers=nb_workers)
+
+	experiment.model.printArchitecture((1,3,input_shape[0],input_shape[1]))
+	experiment.fit()
+	experiment = Experiment.load("models/tmp/experiment")
+	experiment.predict()
+	experiment.visualise()
 
 
-#Parameters
-xSize = 128
-ySize = xSize
-colorMode = 'rgb' #'rgb', 'monochrome'
-flatInput = False
-
-epoch = 250
-batch_size = 32
-optimizer = 'adam' #https://www.tensorflow.org/api_docs/python/tf/keras/optimizers
-loss = 'binary_crossentropy' #https://www.tensorflow.org/api_docs/python/tf/keras/losses
-learningRate = 0.001
-
-trainFolder = 'OIDv4_ToolKit/OID/Dataset/train'
-testFolder = 'OIDv4_ToolKit/OID/Dataset/test'
-validationFolder = 'OIDv4_ToolKit/OID/Dataset/validation'
-
-resumeTraining = False
 
 
 
-
+"""
 if(colorMode == 'rgb'):
     inputShape = (xSize,ySize,3)
 else:
@@ -73,7 +72,7 @@ model = nn.VAECNN(inputShape)
 #https://github.com/EscVM/OIDv4_ToolKit
 
 
-train2D,train_flat = pr.loadFolder(trainFolder + "/Banana",inputShape)
+train2D,train_flat = pr.loadFolder(trainFolder + "/banana",inputShape)
 validation2D, validation_flat = pr.loadFolder(validationFolder + "/Banana", inputShape)
 test2D, test_flat = pr.loadFolder(testFolder + "/Banana", inputShape)
 print(f"Data info: train: {train2D.shape[0]} / validation: {validation2D.shape[0]}/ test: {test2D.shape[0]}")
@@ -117,6 +116,11 @@ model.save_weights('models/temp', history, overwrite=True)
 #!!!!!TESTING!!!!!
 print("Plot")
 #model.load_weights("models/temp1")
+
+print("\nbanana train")
+fileTest = 'Dataset_example/fruit-and-vegetable-image-recognition/train/banana/image_1.jpg'
+pr.testModel(model, fileTest, inputShape, flatInput)
+# modeltl.predict(fileTest)
 
 print("\nbanana train")
 fileTest = 'OIDv4_ToolKit/OID/Dataset/train/Banana/7a270f199e78c912.jpg'
@@ -165,34 +169,9 @@ pr.testModel(model, fileTest, inputShape, flatInput)
 
 
 
-import matplotlib.pyplot as plt
-
-
-def plot_latent_space(vae, n=1, figsize=15):
-    # display a n*n 2D manifold of digits
-    digit_size = 256
-    scale = 1.0
-    figure = np.zeros((digit_size * n, digit_size * n))
-    # linearly spaced coordinates corresponding to the 2D plot
-    # of digit classes in the latent space
-    grid_x = np.linspace(-scale, scale, n)
-    grid_y = np.linspace(-scale, scale, n)[::-1]
-
-    for i, yi in enumerate(grid_y):
-        for j, xi in enumerate(grid_x):
-            z_sample = np.array([[xi, yi]])
-            x_latent = vae.latent.predict(z_sample)
-            x_decoded = vae.decoder.predict(x_latent)
-            digit = x_decoded[0].reshape(digit_size, digit_size,3)
-
-    plt.imshow(digit)
-    plt.show()
-
-
-plot_latent_space(model.model)
-
 
 
 from numba import cuda
 cuda.select_device(0)
 cuda.close()
+"""

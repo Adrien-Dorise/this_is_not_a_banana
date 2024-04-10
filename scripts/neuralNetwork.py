@@ -193,6 +193,8 @@ class VAE_MODEL(NeuralNetwork):
         self.model.compile(optimizer=optimizer)
         self.model.optimizer.learning_rate = lr
         
+        print(self.loss)
+        
         
         
 class VAE_LAYER(Model):
