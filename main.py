@@ -6,19 +6,57 @@ Credit: Law Tech Productions, Adrien Dorise
 February 2023
 """
 
-
-import AutoEncoders as AE
+import sys
+sys.path.append("scripts/")
+import processing as pr
+import neuralNetwork as nn
 import numpy as np
+import cv2
+import pandas as pd
+import transferLearning as tl
+import keras.metrics as metrics
+from sklearn.utils import shuffle
+
+
+#Dynamic memory
+# from tensorflow.compat.v1 import ConfigProto
+# from tensorflow.compat.v1 import InteractiveSession
+# config = ConfigProto()
+# config.gpu_options.allow_growth = True
+# session = InteractiveSession(config=config)
+# session.close()
+
 
 #Parameters
-xSize = 256
-ySize = 256
-colors = 3
-colorMode = 'rgb' #'rgb', 'grayscale
+xSize = 128
+ySize = xSize
+colorMode = 'rgb' #'rgb', 'monochrome'
+flatInput = False
 
-epoch = 100
-batch_size = 16
+epoch = 250
+batch_size = 32
+optimizer = 'adam' #https://www.tensorflow.org/api_docs/python/tf/keras/optimizers
+loss = 'binary_crossentropy' #https://www.tensorflow.org/api_docs/python/tf/keras/losses
+learningRate = 0.001
 
+trainFolder = 'OIDv4_ToolKit/OID/Dataset/train'
+testFolder = 'OIDv4_ToolKit/OID/Dataset/test'
+validationFolder = 'OIDv4_ToolKit/OID/Dataset/validation'
+
+resumeTraining = False
+
+
+
+
+if(colorMode == 'rgb'):
+    inputShape = (xSize,ySize,3)
+else:
+    inputShape = (xSize,ySize,1)
+
+model = nn.VAECNN(inputShape)
+
+#if(model.modelName == "VAECNN"):
+#    loss = None
 
 
 #!!!!!IMAGE PROCESSING!!!!!
@@ -34,73 +72,127 @@ batch_size = 16
 #Downloading images from open image with OIDv4 first (see related folder)
 #https://github.com/EscVM/OIDv4_ToolKit
 
-trainFolder = 'OIDv4_ToolKit/OID/Dataset/train'
-testFolder = 'OIDv4_ToolKit/OID/Dataset/test'
-validationFolder = 'OIDv4_ToolKit/OID/Dataset/validation'
+
+train2D,train_flat = pr.loadFolder(trainFolder + "/Banana",inputShape)
+validation2D, validation_flat = pr.loadFolder(validationFolder + "/Banana", inputShape)
+test2D, test_flat = pr.loadFolder(testFolder + "/Banana", inputShape)
+print(f"Data info: train: {train2D.shape[0]} / validation: {validation2D.shape[0]}/ test: {test2D.shape[0]}")
+
+if not flatInput:
+    train = shuffle(train2D)
+    validation = validation2D
+    test = test2D
+else:
+    train = shuffle(train_flat)
+    validation = validation_flat
+    test = test_flat
 
 
-from keras.preprocessing.image import ImageDataGenerator
-
-train_datagen = ImageDataGenerator(rescale = 1./255,
-                                   shear_range = 0.2,
-                                   zoom_range = 0.2,
-                                   horizontal_flip = True,)
-
-test_datagen = ImageDataGenerator(rescale = 1./255)
-
-training_set = train_datagen.flow_from_directory(trainFolder,
-                                                 target_size = (xSize, ySize),
-                                                 batch_size = batch_size,
-                                                 class_mode = 'input',
-                                                 color_mode=colorMode,
-                                                 )
-
-test_set = test_datagen.flow_from_directory(validationFolder,
-                                            target_size = (xSize, ySize),
-                                            batch_size = batch_size,
-                                            class_mode = 'input',
-                                            color_mode=colorMode)
-
-#!!!!!NEURAL NETWORK!!!!!
-
-a = AE.AutoEncoders([xSize,ySize], colors)
-a.build()
 
 
-a.printInfos()
-a.fit(training_set,test_set,epochs=epoch)
+#!!!!!TRAINING!!!!!
+if not resumeTraining:
+    model, history = pr.trainNew(model, train, validation, optimizer, loss, learningRate, epoch, batch_size)
+else:    
+    history = model.load_weights("models/temp1")
+    model.build(optimizer = optimizer, loss = loss, lr = learningRate)
+    model, history = pr.resumeTraining(model, history, train, validation, learningRate, epoch, batch_size)
 
-saveFile = 'models/AE'
-a.saveModel(saveFile)
-# a.loadModel("models/AE2")
+saveFile = 'models/' + model.name
+model.save_weights(saveFile, history, overwrite=False)
+model.save_weights('models/temp', history, overwrite=True)
 
-# Encode and decode some digits
-# Note that we take them from the *test* set
-# imgTEST = a.predict(test_set)
+
+
+
+# model = nn.AECNN(inputShape)
+# model.build(optimizer = optimizer, loss = loss, lr = learningRate)
+# model.loadModel("models/testAECNN1")
+
+# modeltl = tl.tlModel('VGG16')
+
+
+
 
 #!!!!!TESTING!!!!!
 print("Plot")
-fileTest = 'OIDv4_ToolKit/OID/Dataset/validation/Banana/356b1b9ddd7e3b22.jpg'
-a.plotPrediction(fileTest)
-fileTest = 'OIDv4_ToolKit/OID/Dataset/validation/Banana/694f86.jpg'
-a.plotPrediction(fileTest)
+#model.load_weights("models/temp1")
 
-# from scipy.linalg import norm
-# from scipy import sum, average
-# def normalize(arr):
-#     rng = arr.max()-arr.min()
-#     amin = arr.min()
-#     return (arr-amin)*255/rng
-# def compare_images(img1, img2):
-#     # normalize to compensate for exposure difference, this may be unnecessary
-#     # consider disabling it
-#     img1 = normalize(img1)
-#     img2 = normalize(img2)
-#     # calculate the difference and its norms
-#     diff = img1 - img2  # elementwise for scipy arrays
-#     m_norm = sum(abs(diff))  # Manhattan norm
-#     z_norm = norm(diff.ravel(), 0)  # Zero norm
-#     return (m_norm, z_norm)
-# print(compare_images(test_image,result))
+print("\nbanana train")
+fileTest = 'OIDv4_ToolKit/OID/Dataset/train/Banana/7a270f199e78c912.jpg'
+pr.testModel(model, fileTest, inputShape, flatInput)
+# modeltl.predict(fileTest)
+
+print("\npear-banana test")
+fileTest = 'OIDv4_ToolKit/OID/Dataset/test/Banana/eeb93d366d6c69e7.jpg'
+pr.testModel(model, fileTest, inputShape, flatInput)
+# modeltl.predict(fileTest)
+
+print("\nmeme")
+fileTest = 'OIDv4_ToolKit/OID/Dataset/test/Banana/694f86.jpg'
+pr.testModel(model, fileTest, inputShape, flatInput)
+# modeltl.predict(fileTest)
+
+print("\ncar")
+fileTest = 'Dataset_example/test/voiture.jpg'
+pr.testModel(model, fileTest, inputShape, flatInput)
+# modeltl.predict(fileTest)
+
+print("\nbanana plate test")
+fileTest = 'Dataset_example/test/Cavendish-Banana-s.jpg'
+pr.testModel(model, fileTest, inputShape, flatInput)
+# modeltl.predict(fileTest)
+
+print("\ncontroller")
+fileTest = 'Dataset_example/test/controller.jpg'
+pr.testModel(model, fileTest, inputShape, flatInput)
+# modeltl.predict(fileTest)
+
+print("\nmug")
+fileTest = 'Dataset_example/test/tass.jpg'
+pr.testModel(model, fileTest, inputShape, flatInput)
+# modeltl.predict(fileTest)
+
+print("\nbanana train")
+fileTest = 'Dataset_example/train/00ac03de349a3c5b.jpg'
+pr.testModel(model, fileTest, inputShape, flatInput)
+# modeltl.predict(fileTest)
+
+print("\nbanana train")
+fileTest = 'Dataset_example/train/00d843af60eecf7c.jpg'
+pr.testModel(model, fileTest, inputShape, flatInput)
+# modeltl.predict(fileTest)
 
 
+
+import matplotlib.pyplot as plt
+
+
+def plot_latent_space(vae, n=1, figsize=15):
+    # display a n*n 2D manifold of digits
+    digit_size = 256
+    scale = 1.0
+    figure = np.zeros((digit_size * n, digit_size * n))
+    # linearly spaced coordinates corresponding to the 2D plot
+    # of digit classes in the latent space
+    grid_x = np.linspace(-scale, scale, n)
+    grid_y = np.linspace(-scale, scale, n)[::-1]
+
+    for i, yi in enumerate(grid_y):
+        for j, xi in enumerate(grid_x):
+            z_sample = np.array([[xi, yi]])
+            x_latent = vae.latent.predict(z_sample)
+            x_decoded = vae.decoder.predict(x_latent)
+            digit = x_decoded[0].reshape(digit_size, digit_size,3)
+
+    plt.imshow(digit)
+    plt.show()
+
+
+plot_latent_space(model.model)
+
+
+
+from numba import cuda
+cuda.select_device(0)
+cuda.close()
