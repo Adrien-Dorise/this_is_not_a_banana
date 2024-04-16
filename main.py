@@ -7,7 +7,6 @@ February 2023
 """
 
 
-
 if __name__ == "__main__":
 	from dragonflai.config.ML_config import *
 	from dragonflai.config.NN_config import *
@@ -37,6 +36,3 @@ if __name__ == "__main__":
 	results = experiment.predict()
 	print(results)
 	experiment.visualise()
-
-
-
