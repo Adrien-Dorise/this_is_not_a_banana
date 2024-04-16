@@ -35,37 +35,37 @@ class Variational_Auto_Encoders(NeuralNetwork):
         #Model construction
         #To USER: Adjust your model here
 
-        dropout = 0.1
-        
+        dropout = 0.4
+        channels = [64,128,256,256]
         self.encoder = nn.Sequential().to(self.device)
         self.decoder = nn.Sequential().to(self.device)        
 
         #512
         
-        self.encoder.add_module('encoder_conv1_1', nn.Conv2d(3,16,kernel_size=3, stride=1, padding=1))
+        self.encoder.add_module('encoder_conv1_1', nn.Conv2d(3,channels[0],kernel_size=3, stride=1, padding=1))
         self.encoder.add_module("encoder_relu1_1", nn.ReLU())
-        self.encoder.add_module("encoder_BN1", nn.BatchNorm2d(16))
+        self.encoder.add_module("encoder_BN1", nn.BatchNorm2d(channels[0]))
         self.encoder.add_module("encoder_pool1", nn.MaxPool2d(kernel_size=2, stride=2))
 
         #256
 
-        self.encoder.add_module('encoder_conv2_1', nn.Conv2d(16,32,kernel_size=3, stride=1, padding=1))
+        self.encoder.add_module('encoder_conv2_1', nn.Conv2d(channels[0],channels[1],kernel_size=3, stride=1, padding=1))
         self.encoder.add_module("encoder_relu2_1", nn.ReLU())
-        self.encoder.add_module("encoder_BN2", nn.BatchNorm2d(32))
+        self.encoder.add_module("encoder_BN2", nn.BatchNorm2d(channels[1]))
         self.encoder.add_module("encoder_pool2", nn.MaxPool2d(kernel_size=2, stride=2))
 
         #128
 
-        self.encoder.add_module('encoder_conv3_1', nn.Conv2d(32,64,kernel_size=3, stride=1, padding=1))
+        self.encoder.add_module('encoder_conv3_1', nn.Conv2d(channels[1],channels[2],kernel_size=3, stride=1, padding=1))
         self.encoder.add_module("encoder_relu3_1", nn.ReLU())
-        self.encoder.add_module("encoder_BN3", nn.BatchNorm2d(64))
+        self.encoder.add_module("encoder_BN3", nn.BatchNorm2d(channels[2]))
         self.encoder.add_module("encoder_pool3", nn.MaxPool2d(kernel_size=2, stride=2))
         
         #64
 
-        self.encoder.add_module('encoder_conv4_1', nn.Conv2d(64,128,kernel_size=3, stride=1, padding=1))
+        self.encoder.add_module('encoder_conv4_1', nn.Conv2d(channels[2],channels[3],kernel_size=3, stride=1, padding=1))
         self.encoder.add_module("encoder_relu4_1", nn.ReLU())
-        self.encoder.add_module("encoder_BN4", nn.BatchNorm2d(128))
+        self.encoder.add_module("encoder_BN4", nn.BatchNorm2d(channels[3]))
         self.encoder.add_module("encoder_pool4", nn.MaxPool2d(kernel_size=2, stride=2))
         self.encoder.add_module("encoder_flatten1", nn.Flatten())
 
@@ -75,8 +75,8 @@ class Variational_Auto_Encoders(NeuralNetwork):
         
         #LATENT
         
-        latent_img_shape = 16
-        latent_channels= 128
+        latent_img_shape = 8
+        latent_channels = channels[-1]
 
         self.z_mean = nn.Linear(latent_channels*latent_img_shape*latent_img_shape, 2).to(self.device)
         self.z_log_var = nn.Linear(latent_channels*latent_img_shape*latent_img_shape, 2).to(self.device)
@@ -85,26 +85,27 @@ class Variational_Auto_Encoders(NeuralNetwork):
         
         self.decoder.add_module("latent1", nn.Linear(2, latent_channels*latent_img_shape*latent_img_shape))
         self.decoder.add_module("latent_relu1", nn.ReLU())
+        #self.decoder.add_module("dropout1", nn.Dropout(dropout))
         self.decoder.add_module("latent_reshape2", nn.Unflatten(1,(latent_channels,latent_img_shape,latent_img_shape)))                
         
         #32
         
-        self.decoder.add_module("decoder_conv4_1", nn.ConvTranspose2d(128, 64, kernel_size=3, stride=2, padding=1, output_padding=1))
+        self.decoder.add_module("decoder_conv4_1", nn.ConvTranspose2d(channels[-1], channels[-2], kernel_size=3, stride=2, padding=1, output_padding=1))
         self.decoder.add_module('decoder_relu4_1', nn.ReLU())
 
         #64
         
-        self.decoder.add_module("decoder_conv3_1", nn.ConvTranspose2d(64, 32, kernel_size=3, stride=2, padding=1, output_padding=1))
+        self.decoder.add_module("decoder_conv3_1", nn.ConvTranspose2d(channels[-2], channels[-3], kernel_size=3, stride=2, padding=1, output_padding=1))
         self.decoder.add_module('decoder_relu3_1', nn.ReLU())
         
         #128
 
-        self.decoder.add_module("decoder_conv2_1", nn.ConvTranspose2d(32, 16, kernel_size=3, stride=2, padding=1, output_padding=1))
+        self.decoder.add_module("decoder_conv2_1", nn.ConvTranspose2d(channels[-3], channels[-4], kernel_size=3, stride=2, padding=1, output_padding=1))
         self.decoder.add_module('decoder_relu2_1', nn.ReLU())
 
         #254
 
-        self.decoder.add_module("decoder_conv1_1", nn.ConvTranspose2d(16, 3, kernel_size=3, stride=2, padding=1, output_padding=1))
+        self.decoder.add_module("decoder_conv1_1", nn.ConvTranspose2d(channels[-4], 3, kernel_size=3, stride=2, padding=1, output_padding=1))
         self.decoder.add_module('decoder_sigmoid1', nn.Sigmoid())
         
         #512
@@ -161,9 +162,9 @@ class Variational_Auto_Encoders(NeuralNetwork):
     def set_scheduler(self, scheduler=None, *args, **kwargs):
         '''set scheduler'''
         self.scheduler = []
-        self.scheduler.append(torch.optim.lr_scheduler.ReduceLROnPlateau(self.opt[0], mode='min', factor=0.85, patience=30))
-        self.scheduler.append(torch.optim.lr_scheduler.ReduceLROnPlateau(self.opt[1], mode='min', factor=0.85, patience=30))
-
+        self.scheduler.append(torch.optim.lr_scheduler.ReduceLROnPlateau(self.opt[0], mode='min', factor=0.95, patience=30))
+        self.scheduler.append(torch.optim.lr_scheduler.ReduceLROnPlateau(self.opt[1], mode='min', factor=0.95, patience=30))
+        #self.scheduler = [None]
         
 
 

@@ -157,12 +157,12 @@ class NeuralNetwork(nn.Module):
         self.scaler = [None]
         self.scaler[0] = amp.GradScaler(enabled=self.use_gpu)
         
-    def set_scheduler(self, scheduler=None, *args, **kwargs):
+    def set_scheduler(self, use_scheduler=False, *args, **kwargs):
         '''set scheduler'''
         self.scheduler = [None]
         
-        if self.scheduler is not None:
-            self.scheduler[0] = torch.optim.lr_scheduler.ReduceLROnPlateau(self.opt[0], mode='min', factor=0.75, patience=10) 
+        if use_scheduler:
+            self.scheduler[0] = torch.optim.lr_scheduler.ReduceLROnPlateau(self.opt[0], mode='min', factor=0.999, patience=30) 
         
     def update_scheduler(self, *args, **kwargs):
         '''update scheduler'''
@@ -271,7 +271,7 @@ class NeuralNetwork(nn.Module):
             self.epoch_losses[i] = self.running_loss[i] / dataset_size
             self.losses_train[i].append(self.epoch_losses[i])        
             
-        if epoch % 100 == 0: #Save model every X epochs
+        if epoch % 500 == 0: #Save model every X epochs
             self.saveModel(f"models/tmp/epoch{epoch}")
             
         try:  
@@ -301,6 +301,7 @@ class NeuralNetwork(nn.Module):
             weight_decay=None, 
             valid_set=None,
             loss_indicators=1, 
+            use_scheduler=False,
             batch_size=2):
         """Train a model on a training set
         print(f"Pytorch is setup on: {self.device}")
@@ -319,7 +320,7 @@ class NeuralNetwork(nn.Module):
         self._on_training_start()
         self.init_results(loss_indicators, train_set, valid_set, batch_size, epochs)
         self.set_optimizer(optimizer=optimizer, learning_rate=learning_rate, weight_decay=weight_decay)
-        self.set_scheduler(None)
+        self.set_scheduler(use_scheduler=use_scheduler)
         
         for epoch in range(epochs):
             self._on_epoch_start_time()
@@ -453,7 +454,7 @@ class NeuralNetwork(nn.Module):
         
         # displaying the title
         plt.title("Loss training")
-        plt.show()
+        #plt.show()
         fig.savefig("models/tmp/loss_history.png")
         
     def printArchitecture(self, input_shape):

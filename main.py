@@ -6,22 +6,16 @@ Credit: Law Tech Productions, Adrien Dorise
 February 2023
 """
 
-import sys
-sys.path.append("scripts/")
-import processing as pr
-import neuralNetwork as nn
-from sklearn.utils import shuffle
-
 
 
 if __name__ == "__main__":
 	from dragonflai.config.ML_config import *
 	from dragonflai.config.NN_config import *
 	from dragonflai.config.data_config import *
-	from dragonflai.experiment import *
-
+	from dragonflai.experiment_generative import *
+	from dragonflai.experiment_clustering import *
  
-	experiment = Experiment(NN_model,
+	experiment = Experiment_Clustering(NN_model,
 			train_path,
 			val_path,
 			test_path,
@@ -34,144 +28,15 @@ if __name__ == "__main__":
 			optimizer=optimizer,
 			criterion=crit,
 			scaler=scaler,
+			use_scheduler=use_scheduler,
 			nb_workers=nb_workers)
 
 	experiment.model.printArchitecture((1,3,input_shape[0],input_shape[1]))
+	#experiment = Experiment_Generative.load("models/tmp/experiment")
 	experiment.fit()
-	experiment = Experiment.load("models/tmp/experiment")
-	experiment.predict()
+	results = experiment.predict()
+	print(results)
 	experiment.visualise()
 
 
 
-
-
-"""
-if(colorMode == 'rgb'):
-    inputShape = (xSize,ySize,3)
-else:
-    inputShape = (xSize,ySize,1)
-
-model = nn.VAECNN(inputShape)
-
-#if(model.modelName == "VAECNN"):
-#    loss = None
-
-
-#!!!!!IMAGE PROCESSING!!!!!
-#Using tensorflow dataset to get openImage (don't work with python 3.9 right now)
-#NOTE: tfds not working alongside tensorflow-gpu
-#https://www.tensorflow.org/datasets/overview
-# import tensorflow_datasets as tfds
-# dataset = tfds.load('open_images/v7', split='train')
-
-#Openimage
-#https://storage.googleapis.com/openimages/web/download_v7.html#download-tfds
-
-#Downloading images from open image with OIDv4 first (see related folder)
-#https://github.com/EscVM/OIDv4_ToolKit
-
-
-train2D,train_flat = pr.loadFolder(trainFolder + "/banana",inputShape)
-validation2D, validation_flat = pr.loadFolder(validationFolder + "/Banana", inputShape)
-test2D, test_flat = pr.loadFolder(testFolder + "/Banana", inputShape)
-print(f"Data info: train: {train2D.shape[0]} / validation: {validation2D.shape[0]}/ test: {test2D.shape[0]}")
-
-if not flatInput:
-    train = shuffle(train2D)
-    validation = validation2D
-    test = test2D
-else:
-    train = shuffle(train_flat)
-    validation = validation_flat
-    test = test_flat
-
-
-
-
-#!!!!!TRAINING!!!!!
-if not resumeTraining:
-    model, history = pr.trainNew(model, train, validation, optimizer, loss, learningRate, epoch, batch_size)
-else:    
-    history = model.load_weights("models/temp1")
-    model.build(optimizer = optimizer, loss = loss, lr = learningRate)
-    model, history = pr.resumeTraining(model, history, train, validation, learningRate, epoch, batch_size)
-
-saveFile = 'models/' + model.name
-model.save_weights(saveFile, history, overwrite=False)
-model.save_weights('models/temp', history, overwrite=True)
-
-
-
-
-# model = nn.AECNN(inputShape)
-# model.build(optimizer = optimizer, loss = loss, lr = learningRate)
-# model.loadModel("models/testAECNN1")
-
-# modeltl = tl.tlModel('VGG16')
-
-
-
-
-#!!!!!TESTING!!!!!
-print("Plot")
-#model.load_weights("models/temp1")
-
-print("\nbanana train")
-fileTest = 'Dataset_example/fruit-and-vegetable-image-recognition/train/banana/image_1.jpg'
-pr.testModel(model, fileTest, inputShape, flatInput)
-# modeltl.predict(fileTest)
-
-print("\nbanana train")
-fileTest = 'OIDv4_ToolKit/OID/Dataset/train/Banana/7a270f199e78c912.jpg'
-pr.testModel(model, fileTest, inputShape, flatInput)
-# modeltl.predict(fileTest)
-
-print("\npear-banana test")
-fileTest = 'OIDv4_ToolKit/OID/Dataset/test/Banana/eeb93d366d6c69e7.jpg'
-pr.testModel(model, fileTest, inputShape, flatInput)
-# modeltl.predict(fileTest)
-
-print("\nmeme")
-fileTest = 'OIDv4_ToolKit/OID/Dataset/test/Banana/694f86.jpg'
-pr.testModel(model, fileTest, inputShape, flatInput)
-# modeltl.predict(fileTest)
-
-print("\ncar")
-fileTest = 'Dataset_example/test/voiture.jpg'
-pr.testModel(model, fileTest, inputShape, flatInput)
-# modeltl.predict(fileTest)
-
-print("\nbanana plate test")
-fileTest = 'Dataset_example/test/Cavendish-Banana-s.jpg'
-pr.testModel(model, fileTest, inputShape, flatInput)
-# modeltl.predict(fileTest)
-
-print("\ncontroller")
-fileTest = 'Dataset_example/test/controller.jpg'
-pr.testModel(model, fileTest, inputShape, flatInput)
-# modeltl.predict(fileTest)
-
-print("\nmug")
-fileTest = 'Dataset_example/test/tass.jpg'
-pr.testModel(model, fileTest, inputShape, flatInput)
-# modeltl.predict(fileTest)
-
-print("\nbanana train")
-fileTest = 'Dataset_example/train/00ac03de349a3c5b.jpg'
-pr.testModel(model, fileTest, inputShape, flatInput)
-# modeltl.predict(fileTest)
-
-print("\nbanana train")
-fileTest = 'Dataset_example/train/00d843af60eecf7c.jpg'
-pr.testModel(model, fileTest, inputShape, flatInput)
-# modeltl.predict(fileTest)
-
-
-
-
-
-from numba import cuda
-cuda.select_device(0)
-cuda.close()
-"""

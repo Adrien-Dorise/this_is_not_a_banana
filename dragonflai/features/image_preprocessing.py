@@ -26,7 +26,7 @@ def flattenImage(image):
         np.array: 1d array of the image
     """
     flatImg = np.array(image).flatten()
-    return flatImg.reshape(-1,len(flatImg))
+    return flatImg.reshape(-1,len(flatImg))[0]
 
 def reverseFlatten(image,imgShape):
     """Reverse an image 

@@ -1,0 +1,629 @@
+from lr_ai.model.neuralNetwork import NeuralNetwork
+import torch.nn as nn
+
+import torch
+import torch.nn.functional as F
+
+import numpy as np
+from torch.optim import SGD, Adam, AdamW
+from torch.cuda import amp  
+import os
+import time
+torch.manual_seed(777)
+
+import gc 
+    
+def init_weights(module):
+    if isinstance(module, nn.Conv2d):
+        nn.init.xavier_uniform_(module.weight)
+        module.bias.data.fill_(0.0)
+    elif isinstance(module, nn.Linear):
+        nn.init.xavier_uniform_(module.weight)
+        module.bias.data.fill_(0.0)
+
+
+
+class DoubleConv(nn.Module):
+    
+
+    def __init__(self, in_channels, out_channels, mid_channels=None):
+        super().__init__()
+        if not mid_channels:
+            mid_channels = out_channels
+        self.double_conv = nn.Sequential(
+            nn.Conv2d(in_channels, mid_channels, kernel_size=3, padding=1, bias=False),
+            nn.BatchNorm2d(mid_channels),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(mid_channels, out_channels, kernel_size=3, padding=1, bias=False),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True)
+        )
+
+    def forward(self, x):
+        return self.double_conv(x)
+    
+
+class Down(nn.Module):
+
+    def __init__(self, in_channels, out_channels):
+        super().__init__()
+        self.maxpool_conv = nn.Sequential(
+            nn.MaxPool2d(2),
+            DoubleConv(in_channels, out_channels)
+        )
+
+    def forward(self, x):
+        return self.maxpool_conv(x)
+    
+class Up(nn.Module):
+
+    def __init__(self, in_channels, out_channels):
+        super().__init__()
+
+        self.up = nn.ConvTranspose2d(in_channels, in_channels // 2, kernel_size=2, stride=2)
+        self.conv = DoubleConv(in_channels, out_channels)
+        self.Activation = nn.LeakyReLU()
+
+    def forward(self, x1, x2):
+        x1 = self.up(x1)
+        x = torch.cat([x2, x1], dim=1)
+        return self.Activation(self.conv(x))
+
+class OutConv(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super().__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=1)
+
+    def forward(self, x):
+        return self.conv(x)
+
+#################################################################################################################################
+
+class Unet(NeuralNetwork):
+    """
+
+    """
+    def __init__(self, input_size=512*512*3, outputs=512*512,inputs_channels = 3 , ouputs_channels = 3):
+        NeuralNetwork.__init__(self, input_size, outputs)
+
+        self.inputs_channels = inputs_channels
+        self.outputs_channls = ouputs_channels
+
+        # input treatment 
+        self.architecture.add_module('Entry conv', DoubleConv(in_channels= self.inputs_channels, out_channels= 64)) # Block 0 
+
+        # Downgrading resolution
+
+        self.architecture.add_module("Down1", Down(in_channels = 64, out_channels = 128)) # Block 1
+        self.architecture.add_module("Down2", Down(in_channels = 128, out_channels = 256)) # Block 2 
+        self.architecture.add_module("Down3", Down(in_channels = 256, out_channels = 512)) # Block 3 
+        self.architecture.add_module("Down4", Down(in_channels = 512, out_channels = 1024)) # Block 4 
+
+        # Upgrading resolution 
+
+        self.architecture.add_module("Up1", Up(in_channels = 1024, out_channels = 512)) # Block 5 
+        self.architecture.add_module("Up2", Up(in_channels = 512, out_channels = 256)) # Block 6
+        self.architecture.add_module("Up3", Up(in_channels = 256, out_channels = 128)) # Block 7 
+        self.architecture.add_module("Up4", Up(in_channels = 128, out_channels = 64)) # Block 8  
+
+
+        # Output treatment 
+        self.architecture.add_module('Out Conv', OutConv(in_channels = 64, out_channels = 3))# Block 9
+        # self.architecture.add_module('Out_activ', nn.Sigmoid()) # Block 10  
+        
+        # self.architecture.apply(init_weights)
+        
+        
+    def forward(self, data):
+
+        input0 = self.architecture[0](data)
+        down1 = self.architecture[1](input0)
+        down2 = self.architecture[2](down1)
+        down3 = self.architecture[3](down2)
+        down4 = self.architecture[4](down3)
+
+        up1 = self.architecture[5](down4, down3)
+        up2 = self.architecture[6](up1, down2)
+        up3 = self.architecture[7](up2, down1)
+        up4 = self.architecture[8](up3, input0)
+
+        # output = self.architecture[10](self.architecture[9](up4))
+        output = self.architecture[9](up4)
+        
+        return output 
+
+
+    #################################################################################################################################
+
+class GAN(NeuralNetwork):
+    """
+    GAN (generative adversarial networks) composed of two networks :
+
+    - Generator (Unet): his goal is to fool the discriminator with a fake image.
+    - Discriminato (VGG 16): his goal is two classify images and find if images are true or fake (generated by the generator)
+
+    """
+  
+    def __init__(self, input_size=512*512*3, outputs=2,inputs_channels = 3 , ouputs_channels = 3):
+        NeuralNetwork.__init__(self, input_size, outputs)
+        self.loss_indicators = 1
+        self.inputs_channels = inputs_channels
+        self.outputs_channls = ouputs_channels
+
+        self.generator = nn.Sequential().to(self.device)
+        self.discriminator = nn.Sequential().to(self.device) 
+
+        ######################
+        ### Generator Unet ###
+        ######################
+
+        # input treatment 
+        self.generator.add_module('Entry conv', DoubleConv(in_channels= self.inputs_channels, out_channels= 32)) # Block 0 
+
+        # Downgrading resolution
+
+        self.generator.add_module("Down1", Down(in_channels = 32, out_channels = 64)) # Block 1
+        self.generator.add_module("Down2", Down(in_channels = 64, out_channels = 128)) # Block 2 
+        self.generator.add_module("Down3", Down(in_channels = 128, out_channels = 256)) # Block 3 
+        self.generator.add_module("Down4", Down(in_channels = 256, out_channels = 512)) # Block 4 
+
+        # Upgrading resolution 
+
+        self.generator.add_module("Up1", Up(in_channels = 512, out_channels = 256)) # Block 5 
+        self.generator.add_module("Up2", Up(in_channels = 256, out_channels = 128)) # Block 6
+        self.generator.add_module("Up3", Up(in_channels = 128, out_channels = 64)) # Block 7 
+        self.generator.add_module("Up4", Up(in_channels = 64, out_channels = 32)) # Block 8  
+
+
+        # Output treatment 
+        self.generator.add_module('Out Conv', OutConv(in_channels = 32, out_channels = 3))# Block 9
+
+
+    ###########################
+    ### Discriminator VGG16 ###
+    ###########################
+
+
+        self.discriminator.add_module('Conv1', nn.Conv2d(3, 128, 3, padding=1))
+        self.discriminator.add_module('BN1', nn.BatchNorm2d(128))
+        self.discriminator.add_module('ACT_1', nn.LeakyReLU())
+        self.discriminator.add_module('Conv2', nn.Conv2d(128, 128, 3, padding=1))
+        self.discriminator.add_module('BN2', nn.BatchNorm2d(128))
+        self.discriminator.add_module('ACT_2', nn.LeakyReLU())
+
+        for i in range (5):
+
+            self.discriminator.add_module('Conv{}'.format(i+2), nn.Conv2d(128, 128, 3, stride=2))
+            self.discriminator.add_module('BN{}'.format(i+2), nn.BatchNorm2d(128))
+            self.discriminator.add_module('ACT_{}'.format(i+2), nn.LeakyReLU())
+
+        self.discriminator.add_module('Flatten', nn.Flatten())
+
+        self.discriminator.add_module('Linear1', nn.Linear(6272 , 512))
+        self.discriminator.add_module('ACT_8', nn.LeakyReLU())
+
+        self.discriminator.add_module('Linear2', nn.Linear(512, 32))
+        self.discriminator.add_module('ACT_9', nn.LeakyReLU())
+
+        self.discriminator.add_module('Linear3', nn.Linear(32, 2))
+        self.discriminator.add_module('ACT_out', nn.Softmax())
+        
+    
+        """
+        self.discriminator.add_module('Conv1', nn.Conv2d(3, 32, 3, padding=1))
+        self.discriminator.add_module('Activation_1',nn.LeakyReLU())
+
+        self.discriminator.add_module('Conv2', nn.Conv2d(32, 32, 3, padding=1))
+        self.discriminator.add_module('Activation_1',nn.LeakyReLU())
+
+        self.discriminator.add_module('Maxpool1', nn.MaxPool2d(2, stride=2))
+
+        self.discriminator.add_module('Conv3',nn.Conv2d(32, 32, 3, padding=1))
+        self.discriminator.add_module('Activation_1',nn.LeakyReLU())
+
+        self.discriminator.add_module('Conv4',nn.Conv2d(32, 32, 3, padding=1))
+        self.discriminator.add_module('Activation_1',nn.LeakyReLU())
+
+        self.discriminator.add_module('Maxpool2', nn.MaxPool2d(2, stride=2))
+
+        self.discriminator.add_module('Conv5', nn.Conv2d(32, 64, 3, padding=1))
+        self.discriminator.add_module('Activation_1',nn.LeakyReLU())
+
+        self.discriminator.add_module('Conv6', nn.Conv2d(64, 64, 3, padding=1))
+        self.discriminator.add_module('Activation_1',nn.LeakyReLU())
+
+        self.discriminator.add_module('Conv7', nn.Conv2d(64, 64, 3, padding=1))
+        self.discriminator.add_module('Activation_1',nn.LeakyReLU())
+
+        self.discriminator.add_module('Maxpool3', nn.MaxPool2d(2, stride=2))
+
+        self.discriminator.add_module('Conv8', nn.Conv2d(64, 96, 3, padding=1))
+        self.discriminator.add_module('Activation_1',nn.LeakyReLU())
+
+        self.discriminator.add_module('Conv9',nn.Conv2d(96, 96, 3, padding=1))
+        self.discriminator.add_module('Activation_1',nn.LeakyReLU())
+
+        self.discriminator.add_module('Conv10',  nn.Conv2d(96, 96, 3, padding=1))
+        self.discriminator.add_module('Activation_1',nn.LeakyReLU())
+
+        self.discriminator.add_module('Maxpool4', nn.MaxPool2d(2, stride=2))
+
+        self.discriminator.add_module('Conv11',nn.Conv2d(96, 96, 3, padding=1))
+        self.discriminator.add_module('Activation_1',nn.LeakyReLU())
+
+        self.discriminator.add_module('Conv12',  nn.Conv2d(96, 96, 3, padding=1))
+        self.discriminator.add_module('Activation_1',nn.LeakyReLU())
+
+        self.discriminator.add_module('Conv13', nn.Conv2d(96, 96, 3, padding=1))
+        self.discriminator.add_module('Activation_1',nn.LeakyReLU())
+
+        self.discriminator.add_module('Maxpool4', nn.MaxPool2d(2, stride=2))
+
+        
+        self.discriminator.add_module('Conv14',nn.Conv2d(96, 96, 3, padding=1))
+        self.discriminator.add_module('Activation_1',nn.LeakyReLU())
+
+        self.discriminator.add_module('Conv15',  nn.Conv2d(96, 96, 3, padding=1))
+        self.discriminator.add_module('Activation_1',nn.LeakyReLU())
+
+        self.discriminator.add_module('Conv16', nn.Conv2d(96, 96, 3, padding=1))
+        self.discriminator.add_module('Activation_1',nn.LeakyReLU())
+        self.discriminator.add_module('Maxpool5', nn.MaxPool2d(2, stride=2))
+
+        self.discriminator.add_module('Flatten',nn.Flatten())
+        self.discriminator.add_module('Linear_1',nn.Linear(6144, 2048))
+
+        self.discriminator.add_module('Activation_1',nn.LeakyReLU())
+        self.discriminator.add_module('Linear_2', nn.Linear(2048, 512))
+        self.discriminator.add_module('Activation_2',nn.LeakyReLU())
+        self.discriminator.add_module('Linear_3', nn.Linear(512, 128))
+        self.discriminator.add_module('Activation_3',nn.LeakyReLU())
+        self.discriminator.add_module('Linear_4', nn.Linear(128, 2))
+        self.discriminator.add_module('Activation_4',nn.Softmax())
+        """
+
+    def forward(self, data, used_part = None):
+        """
+          For Gan training we have to train the generator and discriminator separatly. 
+          So we have to use a conditional forward to use specific parts of the model.
+
+          -  'generator': only using the Generator model => input = low resolution image (3 x 256 x 256), output = high resolution image (3 x 256 x 256)
+          -  'discriminator' : only using the Discriminator part => input = High resolution fake or true image (3 x 256 x 256), output = tensor (2) for binary classification 
+          -  '' / None : Using both models, Generator then Discriminator => input = low resolution image (3 x 256 x 256), output = tensor (2) for binary classification
+        
+        """
+        if used_part == 'generator':
+
+            input0 = self.generator[0](data)
+            down1 = self.generator[1](input0)
+            down2 = self.generator[2](down1)
+            down3 = self.generator[3](down2)
+            down4 = self.generator[4](down3)
+
+            up1 = self.generator[5](down4, down3)
+            up2 = self.generator[6](up1,down2)
+            up3 = self.generator[7](up2, down1)
+            up4 = self.generator[8](up3, input0)
+
+            output = self.generator[9](up4)
+        
+        elif used_part == 'discriminator':
+            output = self.discriminator(data)
+
+        else :
+
+            input0 = self.generator[0](data)
+            down1 = self.generator[1](input0)
+            down2 = self.generator[2](down1)
+            down3 = self.generator[3](down2)
+            down4 = self.generator[4](down3)
+
+            up1 = self.generator[5](down4, down3)
+            up2 = self.generator[6](up1,down2)
+            up3 = self.generator[7](up2, down1)
+            up4 = self.generator[8](up3, input0)
+
+            gen_output = self.generator[9](up4)
+
+            output = self.discriminator(gen_output)
+            
+        gc.collect()
+        
+        return output
+
+
+    def _on_batch_start(self, *args, **kwargs):
+        '''
+        Labels création for binary classification ( à reprendre avec fonction torch one hot ):
+            -   True labels = [1,0]
+            -   False labels = [0,1]
+        '''
+        self.start_t = time.time()
+        size = kwargs['size']
+
+        self.true_label = torch.zeros(size).long().to(self.device)
+        self.fake_label = torch.ones_like(self.true_label).long().to(self.device)
+
+        self.true_label = F.one_hot(self.true_label, 2).float().to(self.device)
+        self.fake_label = F.one_hot(self.fake_label, 2).float().to(self.device)
+
+        '''
+
+        Implementation of a trainning ratio to adapt the number of generator training compared to discriminator.
+        It can help if the generator is learning way to fast compared to the discriminator. 
+
+        '''
+        epoch = kwargs['epoch']
+        if ((epoch + 1) % 3) == 0:
+            self.generator.train() 
+        else:
+            self.generator.eval() 
+
+        self.current_batch_train += 1
+
+
+
+    def fit(self, train_set, epochs, 
+                criterion=nn.L1Loss(), 
+                optimizer=Adam, 
+                learning_rate=0.001, 
+                weight_decay=None, 
+                valid_set=None,
+                use_scheduler=False,
+                loss_indicators=1, 
+                batch_size=1):
+            
+            """Train a model on a training set
+            print(f"Pytorch is setup on: {self.device}")
+
+            
+            Args:
+                train_set (torch.utils.data.DataLoader): Training set used to fit the model. This variable contains batch size information + features + target 
+                epochs (int): Amount of epochs to perform during training
+                criterion (torch.nn): Criterion used during training for loss calculation (default = L1Loss() - see: https://pytorch.org/docs/stable/nn.html#loss-functions) 
+                optimizer (torch.optim): Optimizer used during training for backpropagation (default = Adam - see: https://pytorch.org/docs/stable/optim.html#torch.optim.Optimizer)
+                learning_rate: learning_rate used during backpropagation (default = 0.001)
+                valid_set (torch.utils.data.DataLoader): Validation set used to verify model learning. Not mandatory (default = None)
+                use_scheduler (bool): Set to true to use a learning rate scheduler (default = False)
+                loss_indicators (int): Number of loss indicators used during training. Most NN only need one indicator, but distillation models need three (loss, loss_trainer, loss_student). (default = 1)
+            """
+
+            self._on_training_start()
+            self.init_results(loss_indicators, train_set, valid_set, batch_size, epochs)
+            self.set_optimizer(optimizer=optimizer, learning_rate=learning_rate, weight_decay=weight_decay)
+            
+            self.set_optimizer(generator_optimizer=optimizer,discriminator_optimizer=optimizer, learning_rate=learning_rate, weight_decay=weight_decay)# TODO add possibility to have 2 diif opt 
+            self.set_scheduler(None)
+
+            
+            for epoch in range(epochs):
+                self._on_epoch_start() 
+                self.init_epoch(loss_indicators=loss_indicators)
+                self.plot_log(epoch=epoch, loss=0, val_loss=0, lr=self.opt1.param_groups[0]['lr'])
+                for batch_ndx, sample in enumerate(train_set):
+                    inputs, targets = self.get_batch(sample=sample)
+                    self._on_batch_start(epoch = epoch, size=inputs.size(0))
+
+                    self.discriminator.eval()
+                    self.loss_generator, outputs = self.loss_calculation(criterion, inputs)
+                    self.train_batch(generator_loss=self.loss_generator, discriminator_loss=None)
+
+                    self.generator.eval() 
+                    self.discriminator.train()  
+                    self.loss_discriminator, outputs = self.loss_calculation(criterion, inputs, targets)
+                    self.train_batch(discriminator_loss=self.loss_discriminator, generator_loss=None)
+
+                    self.update_train_loss(loss = self.loss_discriminator+self.loss_generator, inputs=inputs)
+                    self.update_scheduler(discriminator_loss=self.loss_discriminator, generator_loss=self.loss_generator)
+
+                    self.plot_log(epoch=epoch, loss=np.mean(self.batch_loss), val_loss=0, lr=self.opt1.param_groups[0]['lr'])
+                    self._on_batch_end()
+                    
+                self.save_epoch_end(epoch=epoch, loss_indicators=loss_indicators, dataset_size=self.dataset_size)
+                self._on_epoch_end()
+                self.discriminator.eval() 
+                self.generator.eval() 
+                val_loss, _, _ = self.predict(valid_set, crit=criterion, loss_indicators=1, epoch=epoch)
+                self.losses_val.append(val_loss)
+            
+            self._on_training_end()
+
+            return self.losses_train, self.losses_val
+
+    def train_batch(self, *args, **kwargs):
+        '''train a batch '''
+        generator_loss = kwargs['generator_loss']
+        discriminator_loss = kwargs['discriminator_loss']
+        generator_loss = kwargs['generator_loss']
+
+        if generator_loss != None :
+            self.scaler.scale(generator_loss).backward()
+
+        if discriminator_loss != None :
+        
+            self.scaler.scale(discriminator_loss).backward()
+
+        self.scaler.step(self.opt1)
+        self.scaler.step(self.opt2)
+
+        self.scaler.update()
+
+        self.opt1.zero_grad()
+        self.opt2.zero_grad()
+
+
+
+
+    def set_optimizer(self, 
+                      generator_optimizer=AdamW,
+                      discriminator_optimizer=AdamW,
+                      learning_rate=1e-4, 
+                      weight_decay=1e-4, 
+                      *args, **kwargs):
+        '''
+            Set two optimizers, one for the generator and one for the discriminator 
+        '''
+        if weight_decay is None:
+            self.opt1 = generator_optimizer(self.generator.parameters(), lr=learning_rate)
+            self.opt2 = discriminator_optimizer(self.discriminator.parameters(), lr=learning_rate)
+
+        else:
+            self.opt1 = generator_optimizer(self.generator.parameters(), lr=learning_rate, 
+                            weight_decay=weight_decay)
+            self.opt2 = discriminator_optimizer(self.discriminator.parameters(), lr=learning_rate, 
+                            weight_decay=weight_decay)
+        
+        
+        self.scaler = amp.GradScaler(enabled=self.use_gpu)
+
+
+
+    def loss_calculation(self, crit, inputs, target=None,Generator=False,  *args, **kwargs):
+        '''
+        compute loss and outputs of the model :
+            -   test 1 : if generator = True the loss and outputs are only computed for the generator part. Usualy used for inference and image generation visualization 
+            -   test 2 : target (HR images) = None the loss computed is the one related to the classification of fake / generated images. Usualy used to compute the generator loss (discriminator.eval())
+            -   test 3 : target (HR images) != None the loss computed is the one related to the discriminator. The loss is computed using fake and true datas.
+        
+        
+        '''
+        if  Generator == True :
+            outputs_fake = self.forward(inputs)
+            
+            loss    = crit(outputs_fake[0], self.true_label[0])
+            outputs = self.forward(inputs, 'generator')
+            del outputs_fake
+            return(loss, outputs)
+        
+        elif target == None :
+            
+            outputs_fake = self.forward(inputs)
+            """
+            True labels are used because generator loss must increase
+            when the discriminator classify fake output as fake.
+            """
+            loss    = crit(outputs_fake, self.true_label)
+            outputs = outputs_fake
+
+            return loss, outputs
+
+        else:
+
+            outputs_fake = self.forward(inputs)
+            outputs_true = self.forward(target, 'discriminator')
+
+            loss    = crit(torch.cat((outputs_fake,outputs_true)), torch.cat((self.fake_label,self.true_label)))
+            outputs = torch.cat((outputs_fake,outputs_true)) 
+            return loss, outputs
+    
+
+    def predict(self, test_set, crit=nn.L1Loss(), loss_indicators=1, epoch=0, train_loss=0, Generator=False):
+        """Use the trained model to predict a target values on a test set
+        
+        For now, we assume that the target value is known, so it is possible to calculate an error value.
+        
+        Args:
+            test_set (torch.utils.data.DataLoader): Data set for which the model predicts a target value. This variable contains batch size information + features + target 
+            criterion (torch.nn): Criterion used during training for loss calculation (default = L1Loss() - see: https://pytorch.org/docs/stable/nn.html#loss-functions) 
+
+        Returns:
+            mean_loss (float): the average error for all batch of data.
+            output (list): Model prediction on the test set
+            [inputs, targets] ([list,list]): Group of data containing the input + target of test set
+        """
+        self._on_predict_start()
+        inputs, outputs, targets, test_loss = [],[],[],[]
+        for batch_ndx, sample in enumerate(test_set):
+            input, target = self.get_batch(sample=sample)
+            self._on_batch_start(epoch = 1, size=input.size(0))
+            loss, output = self.loss_calculation(crit, input, target, Generator = Generator)
+            inputs.extend(np.array(input.cpu().detach().numpy(), dtype=np.float32))
+            targets.extend(np.array(target.cpu().detach().numpy(), dtype=np.float32))
+            outputs.extend(np.array(output.cpu().detach().numpy(), dtype=np.float32))
+            test_loss.append(np.array(loss.item(), dtype=np.float32))
+            self.current_batch_test += 1 
+            if(self.istrain):
+                self.plot_log(epoch=epoch, loss=train_loss, val_loss=np.mean(test_loss), lr=self.opt1.param_groups[0]['lr'])
+            else:
+                print(f"Test loss: {loss}")
+            del loss
+
+
+        mean_loss = np.mean(test_loss)
+        self._on_predict_end()
+        return mean_loss, np.asarray(outputs), [np.asarray(inputs), np.asarray(targets)]
+    
+    def set_scheduler(self, *args, **kwargs):
+        '''set scheduler'''
+        self.generator_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.opt1, mode='min', factor=0.9, patience=10)
+        self.discriminator_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.opt2, mode='min', factor=0.9, patience=10)
+
+    def update_scheduler(self, *args, **kwargs):
+        '''update scheduler'''
+        generator_loss = kwargs['generator_loss']
+        discriminator_loss = kwargs['discriminator_loss']
+
+        if generator_loss != None :
+            self.generator_scheduler.step(generator_loss) 
+        if discriminator_loss != None :        
+            self.discriminator_scheduler.step(discriminator_loss) 
+
+    def init_epoch(self, *args, **kwargs):
+        '''init epoch'''
+        loss_indicators   = kwargs['loss_indicators']
+        self.running_loss = [0 for _ in range(loss_indicators)]
+        self.opt1.zero_grad()
+        self.opt2.zero_grad()
+        self.batch_loss    = [[] for _ in range(loss_indicators)]
+        self.current_batch_train = 0
+        self.current_batch_test = 0
+
+    '''def plot_log(self, *args, **kwargs):
+        epoch                 = kwargs['epoch']
+        loss                  = kwargs['loss']
+        val_loss              = kwargs['val_loss']
+        verbosity             = kwargs['verbosity']
+        
+        lr = self.opt1.param_groups[0]['lr']
+        
+        verbose = verbosity
+        if self.current_batch_test == self.steps_per_epoch_test:
+            #if info == 'VAL':
+            verbose = 2
+                
+        self.print_progress(epoch+1, lr, loss, val_loss, verbose)'''
+
+    def plot_log(self, *args, **kwargs):
+        '''plot log during training'''
+        
+        if self.verbosity > 0:
+            epoch    = kwargs['epoch']
+            loss     = kwargs['loss']
+            val_loss = kwargs['val_loss']
+            lr       = kwargs['lr']
+            
+            column, _ = os.get_terminal_size()
+            verbose = self.verbosity
+            if self.current_batch_test == self.steps_per_epoch_test:
+                verbose = 2
+                
+            if not self.istrain:
+                lr = 0
+                    
+            size_bar = column - 115
+            i        = (size_bar * (self.current_batch_train + self.current_batch_test) // (self.steps_per_epoch_train + self.steps_per_epoch_test))
+            end      = '\r'
+            total    = (self.steps_per_epoch_train + self.steps_per_epoch_test) 
+            if self.current_batch_test == self.steps_per_epoch_test:
+                est_t = 't ~ {} s.'.format(np.around(self.duration_t * total, decimals=2))
+            else:
+                est_t  = 't ~ {} s.'.format(np.around(self.duration_t * (total - (self.current_batch_train + self.current_batch_test)), decimals=2))
+            
+            if verbose == 2:
+                end = '\n'
+            print('[{:4d}/{:4d}, {:4d}/{:4d}, {:4d}/{:4d}] : [{}>{}] : lr = {:.3e} - loss = {:.3e} - val = {:.3e} - {}  '.format(epoch,self.epochs,
+                                                                                            self.current_batch_train, self.steps_per_epoch_train,
+                                                                                            self.current_batch_test, self.steps_per_epoch_test,
+                                                                                            '=' * i, ' ' * (size_bar - i),
+                                                                                            lr, loss, val_loss, est_t), end=end)
+

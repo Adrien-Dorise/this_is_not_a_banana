@@ -15,7 +15,7 @@ def init_weights(module):
 
 
 class Convolutional_Skip(NeuralNetwork):
-    """Auto_encoders for image generation
+    """Network using skip for image generation
     Subclass of NeuralNetwork, the architecture have to be set by the user in the __init__() function.
 
     """
@@ -59,3 +59,39 @@ class Convolutional_Skip(NeuralNetwork):
         '''update scheduler'''
         loss = kwargs['loss']
         self.scheduler.step(loss)
+
+
+class CNN_Feature_Extraction(NeuralNetwork):
+    """CNN architecture used for feature extraction
+    Subclass of NeuralNetwork, the architecture have to be set by the user in the __init__() function.
+    
+    """
+    def __init__(self, input_size=512*512*3, outputs=512*512):
+        NeuralNetwork.__init__(self, input_size, outputs)
+        #Model construction
+        #To USER: Adjust your model here
+
+        dropout=0.25
+        channels = [16,32]
+
+        self.architecture.add_module('conv1_1', nn.Conv2d(3,channels[0],kernel_size=3, stride=1, padding=0))
+        self.architecture.add_module("conv1_BN", nn.BatchNorm2d(channels[0]))
+        self.architecture.add_module("conv1_act", nn.ReLU())
+
+        for i in range(len(channels)-1):
+            self.architecture.add_module(f"conv{i}_1", nn.Conv2d(channels[i],channels[i+1],kernel_size=3, stride=1, padding=0))
+            self.architecture.add_module(f"conv{i}_BN", nn.BatchNorm2d(channels[i]))
+            self.architecture.add_module(f"conv{i}_act", nn.ReLU())
+        
+
+            
+        self.architecture.add_module('conv_end', nn.Conv2d(channels[-1],channels[-1],kernel_size=3, stride=1, padding=0))
+        self.architecture.add_module('conv_end_act', nn.Sigmoid())
+        
+        self.architecture.apply(init_weights)
+        
+        
+    def forward(self, data):
+        out = self.architecture(data)
+        
+        return out

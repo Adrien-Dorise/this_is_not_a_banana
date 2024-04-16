@@ -8,14 +8,14 @@
 from sklearn.preprocessing import MinMaxScaler
 
 
-train_path = r"Dataset_example/Banana/train/"
-val_path = r"Dataset_example/Banana/validation/"
-test_path = r"Dataset_example/Banana/test/"
-visu_path = r"Dataset_example/Banana/test/"
+train_path = r"datasets/Banana/train/"
+val_path = r"datasets/examples/Banana/validation/"
+test_path = r"datasets/examples/Banana/test/"
+visu_path = r"datasets/examples/Banana/test/"
 save_path = r"models/tmp/dummy_experiment/"
 
 input_shape = (128,128)
 colorMode = 'rgb' #'rgb', 'monochrome'
-scaler = MinMaxScaler()
+scaler = None
 nb_workers = 0
 
