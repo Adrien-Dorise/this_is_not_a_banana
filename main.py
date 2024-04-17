@@ -32,8 +32,8 @@ if __name__ == "__main__":
 			nb_workers=nb_workers)
 
 	experiment.model.printArchitecture((1,3,input_shape[0],input_shape[1]))
-	#experiment = Experiment_Generative.load("models/tmp/experiment")
 	experiment.fit()
+	#experiment = Experiment_Generative.load("models/tmp/experiment")
 	results = experiment.predict()
 	print(results)
 	experiment.visualise()

@@ -15,7 +15,7 @@ from sklearn.preprocessing import MinMaxScaler
 import torch
 from enum import Enum
 import dragonflai.visualisation.plot as plot
-
+import dragonflai.postprocess.score as sc
 
 
 
@@ -59,7 +59,7 @@ class Experiment_Clustering():
         import sklearn.cluster as clust
         #Model parameters  
         self.model = model
-        self.cluster_model = clust.KMeans(3)
+        self.cluster_model = clust.KMeans(1)
         self.no_batch = False
         self.scheduler = use_scheduler 
         self.loss_indicators = 1
@@ -93,8 +93,8 @@ class Experiment_Clustering():
                 result.append(output.cpu().detach().numpy())
 
         result = np.array(result)
-        result = result.flatten().reshape(np.shape(result)[0],-1)
-        return result
+        result_flatten = result.flatten().reshape(np.shape(result)[0],-1)
+        return result, result_flatten
 
     def fit(self):
         """Train the model using the data available in the train and validation folder path.
@@ -120,19 +120,25 @@ class Experiment_Clustering():
 
         self.model.saveModel(f"models/tmp/model")
 
-        encoded = self.get_encoded(train_set)
-        self.cluster_model.fit(encoded)
+        _, encoded_flatten = self.get_encoded(train_set)
+        self.cluster_model.fit(encoded_flatten)
 
         self.save(f"models/tmp/experiment")
         
-
+    
     def predict(self):          
         """Model prediction on the samples available in the test folder path
         """
+        results = []
+        centroid = self.cluster_model.cluster_centers_[0]
         # !!! Data loading !!!
         test_set = imgpr.img_loader(self.test_path, shape=self.input_shape, shuffle=False,
                                     batch_size=self.batch_size,num_workers=self.nb_workers)
-        return self.cluster_model.predict(self.get_encoded(test_set))
+        _, encoded_features_flatten = self.get_encoded(test_set)
+        for feat in encoded_features_flatten:
+            results.append(sc.clustering_score(centroid, feat))
+        
+        return results
 
 
     def visualise(self):
@@ -145,8 +151,16 @@ class Experiment_Clustering():
         
         score, pred, (feature, target) = self.model.predict(visu_set,self.criterion)
 
+        encoded_features, encoded_flatten = self.get_encoded(visu_set)
+        centroid = self.cluster_model.cluster_centers_[0]
+
+        plot.visualise_conv_filters(self.model.architecture[0],f"output/tmp/convolution_filters.png")
         for i in range(len(target)):
-            plot.save_results(target[i], pred[i], f"output/tmp/img{i}.png")
+            score = sc.clustering_score(centroid,encoded_flatten[i])
+            plot.visualise_conv_result(encoded_features[i], score, f"output/tmp/img{i}_convolution.png")
+            score = sc.generation_score(target[i],pred[i])
+            plot.plot_generation(target[i], pred[i], score, f"output/tmp/img{i}_generation.png")
+
 
 
 

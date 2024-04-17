@@ -14,6 +14,7 @@ from sklearn.preprocessing import MinMaxScaler
 import torch
 from enum import Enum
 import dragonflai.visualisation.plot as plot
+import dragonflai.postprocess.score as sc
 
 
 
@@ -128,7 +129,8 @@ class Experiment_Generative():
         score, pred, (feature, target) = self.model.predict(visu_set,self.criterion)
 
         for i in range(len(target)):
-            plot.save_results(target[i], pred[i], f"output/tmp/img{i}.png")
+            score = sc.generation_score(target[i],pred[i])
+            plot.plot_generation(target[i], pred[i], score, f"output/tmp/img{i}.png")
 
 
 
@@ -152,8 +154,8 @@ class Experiment_Generative():
         Args:
             filename (string): Path to the pickle saved object.
         """
-        with open(filename, 'rb') as file:
-            try:
+        try:
+            with open(filename, 'rb') as file:
                return pickle.load(file)
-            except EOFError:
-                raise Exception("Error in load experiment: Pickle was not able to retrieve the file.")
+        except Exception:
+            raise Exception("Error in load experiment: Pickle was not able to retrieve the file.")

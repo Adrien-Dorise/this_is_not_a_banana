@@ -28,11 +28,7 @@ class VAE_loss(nn.Module):
 
         return (loss_MSE + loss_KLD)/1000
 
-class SSIM_loss(ssim.SSIM):
-    #def __init__(self):
-    #    super(SSIM_loss,self).__init__()
-    #    self.ssim_loss = metrics.SSIM(data_range=255)
-    
+class SSIM_loss(ssim.SSIM):   
     def forward(self,input, target):
         return 1 - super().forward(input,target)
 
@@ -42,7 +38,7 @@ output_size = 128*128*3
 NN_model = AE_clust.Auto_Encoders_no_latent(input_size,output_size)
 
 batch_size = 4
-num_epoch = 3
+num_epoch = 5
 lr = 5e-4
 wd = None
 optimizer = torch.optim.AdamW
