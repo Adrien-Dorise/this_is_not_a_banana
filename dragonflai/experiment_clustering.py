@@ -101,7 +101,7 @@ class Experiment_Clustering():
         """
         # !!! Data loading !!!
         train_set = imgpr.img_loader(self.train_path, shape=self.input_shape, shuffle=self.shuffle, 
-                                     batch_size=self.batch_size, num_workers=self.nb_workers)
+                                     batch_size=self.batch_size, num_workers=self.nb_workers, add_augmentation=True)
         val_set = imgpr.img_loader(self.val_path, shape=self.input_shape, shuffle=False,
                                    batch_size=self.batch_size, num_workers=self.nb_workers)
     

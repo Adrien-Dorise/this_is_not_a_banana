@@ -30,21 +30,21 @@ class Auto_Encoders_no_latent(NeuralNetwork):
                     32,16,
                     8,8]
 
-        self.encoder.add_module('encoder_conv1', nn.Conv2d(3,channels[0],kernel_size=3, stride=1, padding=1))
+        self.encoder.add_module('encoder_conv1', nn.Conv2d(3,channels[0],kernel_size=5, stride=1, padding=2))
         self.encoder.add_module("encoder_relu1", nn.ReLU())
-        self.encoder.add_module('encoder_conv1_', nn.Conv2d(channels[0],channels[1],kernel_size=3, stride=1, padding=1))
+        self.encoder.add_module('encoder_conv1_', nn.Conv2d(channels[0],channels[1],kernel_size=5, stride=1, padding=2))
         self.encoder.add_module("encoder_relu1_", nn.ReLU())
         self.encoder.add_module("encoder_pool1", nn.MaxPool2d(kernel_size=2, stride=2))
 
-        self.encoder.add_module('encoder_conv2', nn.Conv2d(channels[1],channels[2],kernel_size=3, stride=1,padding=1))
+        self.encoder.add_module('encoder_conv2', nn.Conv2d(channels[1],channels[2],kernel_size=5, stride=1, padding=2))
         self.encoder.add_module("encoder_relu2", nn.ReLU())
-        self.encoder.add_module('encoder_conv2_', nn.Conv2d(channels[2],channels[3],kernel_size=3, stride=1,padding=1))
+        self.encoder.add_module('encoder_conv2_', nn.Conv2d(channels[2],channels[3],kernel_size=5, stride=1, padding=2))
         self.encoder.add_module("encoder_relu2_", nn.ReLU())
         self.encoder.add_module("encoder_pool2", nn.MaxPool2d(kernel_size=2, stride=2))
 
-        self.encoder.add_module('encoder_conv3', nn.Conv2d(channels[3],channels[4],kernel_size=3, stride=1,padding=1))
+        self.encoder.add_module('encoder_conv3', nn.Conv2d(channels[3],channels[4],kernel_size=5, stride=1, padding=2))
         self.encoder.add_module("encoder_relu3", nn.ReLU())
-        self.encoder.add_module('encoder_conv3_', nn.Conv2d(channels[4],channels[5],kernel_size=3, stride=1,padding=1))
+        self.encoder.add_module('encoder_conv3_', nn.Conv2d(channels[4],channels[5],kernel_size=5, stride=1, padding=2))
         self.encoder.add_module("encoder_relu3_", nn.ReLU())
         self.encoder.add_module("encoder_pool3", nn.MaxPool2d(kernel_size=2, stride=2))
 

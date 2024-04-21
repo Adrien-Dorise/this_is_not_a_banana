@@ -42,14 +42,14 @@ def plot_generation(target, prediction, score, save_path):
     plt.savefig(save_path)
 
 def visualise_conv_filters(encoder, save_path):
-    filters = encoder.encoder_conv1.weight.detach().cpu()
+    filters = encoder.encoder_conv3.weight.detach().cpu()
     filters = (filters - filters.min()) / (filters.max() - filters.min())
-#TODO : The layers are done by RGB, I need to display them indivudually.
+    filters = filters.reshape(-1,np.shape(filters)[-2],np.shape(filters)[-1])
     num_filters = filters.size(0)
     y_size, x_size = get_closest_multiply(num_filters)
     fig, axes = plt.subplots(x_size, y_size, figsize=(10, 10))
     for idx, ax in enumerate(axes.flat):
-        ax.imshow(filters[idx].permute(1, 2, 0), cmap="gray")
+        ax.imshow(filters[idx], cmap="gray")
         ax.axis('off')
     plt.savefig(save_path)
 
