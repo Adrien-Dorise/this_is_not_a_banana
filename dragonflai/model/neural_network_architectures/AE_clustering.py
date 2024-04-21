@@ -13,6 +13,49 @@ def init_weights(module):
         module.bias.data.fill_(0.0)
 
 
+class DoubleDown(nn.Module):
+    def __init__(self, in_channels, mid_channels, out_channels):
+        super().__init__()
+        self.layer = nn.Sequential(
+            nn.Conv2d(in_channels, mid_channels, kernel_size=5, stride=1, padding=2, bias=False),
+            nn.BatchNorm2d(mid_channels),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(mid_channels, out_channels, kernel_size=5, stride=1, padding=2, bias=False),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2, stride=2)
+        )
+
+    def forward(self, x):
+        return self.layer(x)
+    
+
+class Down(nn.Module):
+
+    def __init__(self, in_channels, out_channels):
+        super().__init__()
+        self.layer = nn.Sequential(
+            nn.Conv2d(in_channels, out_channels, kernel_size=5, stride=1, padding=2, bias=False),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2, stride=2)
+        )
+
+    def forward(self, x):
+        return self.layer(x)
+    
+class Up(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super().__init__()
+        self.layer = nn.Sequential(
+            nn.ConvTranspose2d(in_channels, out_channels, kernel_size=2, stride=2),
+            nn.ReLU()
+        )
+
+    def forward(self, x):
+        return self.layer(x)
+
+
 class Auto_Encoders_no_latent(NeuralNetwork):
     """Auto_encoders for image generation
     Subclass of NeuralNetwork, the architecture have to be set by the user in the __init__() function.
@@ -26,38 +69,20 @@ class Auto_Encoders_no_latent(NeuralNetwork):
         self.encoder = nn.Sequential().to(self.device)
         self.decoder = nn.Sequential().to(self.device)    
 
-        channels = [128,64,
-                    32,16,
-                    8,8]
+        channels = [64,32,16,8]
 
-        self.encoder.add_module('encoder_conv1', nn.Conv2d(3,channels[0],kernel_size=5, stride=1, padding=2))
-        self.encoder.add_module("encoder_relu1", nn.ReLU())
-        self.encoder.add_module('encoder_conv1_', nn.Conv2d(channels[0],channels[1],kernel_size=5, stride=1, padding=2))
-        self.encoder.add_module("encoder_relu1_", nn.ReLU())
-        self.encoder.add_module("encoder_pool1", nn.MaxPool2d(kernel_size=2, stride=2))
-
-        self.encoder.add_module('encoder_conv2', nn.Conv2d(channels[1],channels[2],kernel_size=5, stride=1, padding=2))
-        self.encoder.add_module("encoder_relu2", nn.ReLU())
-        self.encoder.add_module('encoder_conv2_', nn.Conv2d(channels[2],channels[3],kernel_size=5, stride=1, padding=2))
-        self.encoder.add_module("encoder_relu2_", nn.ReLU())
-        self.encoder.add_module("encoder_pool2", nn.MaxPool2d(kernel_size=2, stride=2))
-
-        self.encoder.add_module('encoder_conv3', nn.Conv2d(channels[3],channels[4],kernel_size=5, stride=1, padding=2))
-        self.encoder.add_module("encoder_relu3", nn.ReLU())
-        self.encoder.add_module('encoder_conv3_', nn.Conv2d(channels[4],channels[5],kernel_size=5, stride=1, padding=2))
-        self.encoder.add_module("encoder_relu3_", nn.ReLU())
-        self.encoder.add_module("encoder_pool3", nn.MaxPool2d(kernel_size=2, stride=2))
+        #ENCODER
+        self.encoder.add_module('down1', Down(3,channels[0]))
+        self.encoder.add_module('down2', Down(channels[0],channels[1]))
+        self.encoder.add_module('down3', Down(channels[1],channels[2]))        
+        self.encoder.add_module('down4', Down(channels[2],channels[3]))        
 
         #DECODER
-
-        self.decoder.add_module("decoder_conv5", nn.ConvTranspose2d(channels[-1], channels[-3], kernel_size=2, stride=2))
-        self.decoder.add_module('decoder_relu5', nn.ReLU())
-
-        self.decoder.add_module("decoder_conv4", nn.ConvTranspose2d(channels[-3], channels[-5], kernel_size=2, stride=2))
-        self.decoder.add_module('decoder_relu4', nn.ReLU())
-        
-        self.decoder.add_module("decoder_conv3", nn.ConvTranspose2d(channels[-5], 3, kernel_size=2, stride=2))
-        self.decoder.add_module('decoder_sigmoid1', nn.Sigmoid())
+        self.decoder.add_module("up1", Up(channels[-1],channels[-2]))
+        self.decoder.add_module("up2", Up(channels[-2],channels[-3]))
+        self.decoder.add_module("up3", Up(channels[-3],channels[-4]))
+        self.decoder.add_module("up4_1", nn.ConvTranspose2d(channels[-4], 3, kernel_size=2, stride=2))
+        self.decoder.add_module('up4_2', nn.Sigmoid())
         
         self.architecture.add_module("encoder",self.encoder)
         self.architecture.add_module("decoder",self.decoder)

@@ -6,9 +6,6 @@ Last updated: Adrien Dorise - April 2024
 
 """
 
-import dragonflai.features.image_preprocessing as pr
-import dragonflai.postprocess.score as sc
-
 import matplotlib.pyplot as plt
 import cv2
 from math import sqrt
@@ -28,7 +25,6 @@ def get_closest_multiply(integer):
 
 
 def plot_generation(target, prediction, score, save_path):   
-    
     target = target.transpose(1,2,0)
     target = cv2.cvtColor(target, cv2.COLOR_BGR2RGB)
     prediction = prediction.transpose(1,2,0)
@@ -42,7 +38,7 @@ def plot_generation(target, prediction, score, save_path):
     plt.savefig(save_path)
 
 def visualise_conv_filters(encoder, save_path):
-    filters = encoder.encoder_conv3.weight.detach().cpu()
+    filters = encoder[-1].layer[0].weight.detach().cpu()
     filters = (filters - filters.min()) / (filters.max() - filters.min())
     filters = filters.reshape(-1,np.shape(filters)[-2],np.shape(filters)[-1])
     num_filters = filters.size(0)
@@ -56,7 +52,7 @@ def visualise_conv_filters(encoder, save_path):
 def visualise_conv_result(conv_output, score, save_path):
     y_size, x_size = get_closest_multiply(np.shape(conv_output)[0])
     fig, axes = plt.subplots(x_size, y_size, figsize=(10, 10))
-    fig.suptitle("Encoder filters output\nClustering score=" + str(int(score)))
+    fig.suptitle("Encoder filters output\nClustering score=" + str(round(score,4)))
     for idx, ax in enumerate(axes.flat):
         ax.imshow(conv_output[idx], cmap='gray')  # Display each channel of the output
         ax.axis('off')

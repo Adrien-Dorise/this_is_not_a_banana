@@ -76,13 +76,13 @@ class Experiment_Clustering():
         self.shuffle = True
             
         #Training parameters
-        self.num_epoch = num_epoch
-        self.batch_size = batch_size
-        self.learning_rate = learning_rate
-        self.weight_decay = weight_decay
-        self.optimizer = optimizer
-        self.criterion = criterion
-        self.nb_workers = nb_workers
+        self.set_training_parameters(num_epoch=num_epoch,
+                                     batch_size=batch_size,
+                                     learning_rate=learning_rate,
+                                     weight_decay=weight_decay,
+                                     optimizer=optimizer,
+                                     criterion=criterion,
+                                     nb_workers=nb_workers)
          
     def get_encoded(self, dataloader):
         result = []
@@ -95,6 +95,26 @@ class Experiment_Clustering():
         result = np.array(result)
         result_flatten = result.flatten().reshape(np.shape(result)[0],-1)
         return result, result_flatten
+
+    
+    def set_training_parameters(self,
+                        num_epoch=50,
+                        batch_size=32,
+                        learning_rate=1e-03,
+                        weight_decay=1e-03,    
+                        optimizer=torch.optim.Adam,
+                        criterion=torch.nn.L1Loss(),
+                        nb_workers=0):
+        
+        #Training parameters
+        self.num_epoch = num_epoch
+        self.batch_size = batch_size
+        self.learning_rate = learning_rate
+        self.weight_decay = weight_decay
+        self.optimizer = optimizer
+        self.criterion = criterion
+        self.nb_workers = nb_workers
+
 
     def fit(self):
         """Train the model using the data available in the train and validation folder path.

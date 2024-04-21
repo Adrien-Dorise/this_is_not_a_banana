@@ -162,7 +162,7 @@ class NeuralNetwork(nn.Module):
         self.scheduler = [None]
         
         if use_scheduler:
-            self.scheduler[0] = torch.optim.lr_scheduler.ReduceLROnPlateau(self.opt[0], mode='min', factor=0.999, patience=30) 
+            self.scheduler[0] = torch.optim.lr_scheduler.ReduceLROnPlateau(self.opt[0], mode='min', factor=0.99, patience=30) 
         
     def update_scheduler(self, *args, **kwargs):
         '''update scheduler'''

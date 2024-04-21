@@ -38,7 +38,7 @@ output_size = 128*128*3
 NN_model = AE_clust.Auto_Encoders_no_latent(input_size,output_size)
 
 batch_size = 4
-num_epoch = 5
+num_epoch = 50
 lr = 5e-4
 wd = None
 optimizer = torch.optim.AdamW
