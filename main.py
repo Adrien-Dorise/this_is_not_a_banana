@@ -31,8 +31,15 @@ if __name__ == "__main__":
 			use_scheduler=use_scheduler,
 			nb_workers=nb_workers)
 
+	#experiment = Experiment_Clustering.load("models/tmp/experiment")
+	#experiment.set_training_parameters(num_epoch=num_epoch,
+	#									batch_size=batch_size,
+	#									learning_rate=lr,
+	#									weight_decay=wd,
+	#									optimizer=optimizer,
+	#									criterion=crit,
+	#									nb_workers=nb_workers)
 	experiment.model.printArchitecture((1,3,input_shape[0],input_shape[1]))
-	#experiment = Experiment_Generative.load("models/tmp/experiment")
 	experiment.fit()
 	results = experiment.predict()
 	print(results)

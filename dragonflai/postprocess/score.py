@@ -8,8 +8,11 @@ Last updated: Adrien Dorise - April 2024
 
 from math import sqrt
 import dragonflai.features.image_preprocessing as pr
+import numpy as np
+import skimage
 
-def score(target,prediction):
+
+def generation_score(target,prediction):
     score = 0
     target = pr.flattenImage(target)
     prediction = pr.flattenImage(prediction)
@@ -19,6 +22,14 @@ def score(target,prediction):
         #score = 10**-score
         #score = score*10
     return score
+
+def ssim_score(target, prediction):
+    score, img = skimage.metrics.structural_similarity(prediction, target, channel_axis=2, data_range=1, full=True)
+    return score, img
+
+def clustering_score(centroid,encoded_features, lnorm=2):
+    return np.linalg.norm(centroid-encoded_features,ord=lnorm) 
+
 
 
 if __name__ == "__main__":
