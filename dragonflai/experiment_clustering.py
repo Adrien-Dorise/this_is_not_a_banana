@@ -178,8 +178,7 @@ class Experiment_Clustering():
         for i in range(len(target)):
             score = sc.clustering_score(centroid,encoded_flatten[i])
             plot.visualise_conv_result(encoded_features[i], score, f"output/tmp/img{i}_convolution.png")
-            score = sc.generation_score(target[i],pred[i])
-            plot.plot_generation(target[i], pred[i], score, f"output/tmp/img{i}_generation.png")
+            plot.plot_generation(target[i], pred[i], f"output/tmp/img{i}_generation.png")
 
 
 

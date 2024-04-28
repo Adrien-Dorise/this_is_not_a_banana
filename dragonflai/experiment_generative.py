@@ -129,8 +129,7 @@ class Experiment_Generative():
         score, pred, (feature, target) = self.model.predict(visu_set,self.criterion)
 
         for i in range(len(target)):
-            score = sc.generation_score(target[i],pred[i])
-            plot.plot_generation(target[i], pred[i], score, f"output/tmp/img{i}.png")
+            plot.plot_generation(target[i], pred[i], f"output/tmp/img{i}.png")
 
 
 
