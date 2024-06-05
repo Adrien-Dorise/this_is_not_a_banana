@@ -3,6 +3,7 @@ import torch.nn as nn
 
 
 
+
     
 def init_weights(module):
     if isinstance(module, nn.Conv2d):
@@ -11,7 +12,7 @@ def init_weights(module):
     elif isinstance(module, nn.Linear):
         nn.init.xavier_uniform_(module.weight)
         module.bias.data.fill_(0.0)
-
+    
 
 class DoubleDown(nn.Module):
     def __init__(self, in_channels, mid_channels, out_channels):
@@ -25,6 +26,7 @@ class DoubleDown(nn.Module):
             nn.ReLU(inplace=True),
             nn.MaxPool2d(kernel_size=2, stride=2)
         )
+        self.layer.apply(init_weights)
 
     def forward(self, x):
         return self.layer(x)
@@ -35,11 +37,12 @@ class Down(nn.Module):
     def __init__(self, in_channels, out_channels):
         super().__init__()
         self.layer = nn.Sequential(
-            nn.Conv2d(in_channels, out_channels, kernel_size=5, stride=1, padding=2, bias=False),
+            nn.Conv2d(in_channels, out_channels, kernel_size=5, stride=1, padding=2, bias=True),
             nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(kernel_size=2, stride=2)
         )
+        self.layer.apply(init_weights)
 
     def forward(self, x):
         return self.layer(x)
@@ -48,9 +51,10 @@ class UpTranspose(nn.Module):
     def __init__(self, in_channels, out_channels):
         super().__init__()
         self.layer = nn.Sequential(
-            nn.ConvTranspose2d(in_channels, out_channels, kernel_size=2, stride=2, bias=False),
+            nn.ConvTranspose2d(in_channels, out_channels, kernel_size=2, stride=2, bias=True),
             nn.ReLU()
         )
+        self.layer.apply(init_weights)
 
     def forward(self, x):
         return self.layer(x)
@@ -59,11 +63,12 @@ class Up(nn.Module):
     def __init__(self, in_channels, out_channels):
         super().__init__()
         self.layer = nn.Sequential(
-            nn.Conv2d(in_channels, out_channels, kernel_size=5, stride=1, padding=2, bias=False),
+            nn.Conv2d(in_channels, out_channels, kernel_size=5, stride=1, padding=2, bias=True),
             nn.BatchNorm2d(out_channels),
             nn.ReLU(),
             nn.Upsample(scale_factor=2, mode="bilinear")
         )
+        self.layer.apply(init_weights)
 
     def forward(self, x):
         return self.layer(x)
@@ -83,7 +88,7 @@ class Auto_Encoders_latent(NeuralNetwork):
         self.decoder = nn.Sequential().to(self.device)
         self.latent = nn.Sequential().to(self.device)
 
-        channels = [128,64,32,16]
+        channels = [16,16,8,8]
 
         #ENCODER
         self.encoder.add_module('down1', Down(3,channels[0]))
@@ -93,7 +98,7 @@ class Auto_Encoders_latent(NeuralNetwork):
 
 
         #LATENT
-        latent_dim = 1024
+        latent_dim = 512
         latent_img_shape = 8
         latent_channels= channels[-1]
 
@@ -115,7 +120,7 @@ class Auto_Encoders_latent(NeuralNetwork):
         self.decoder.add_module("up2", Up(channels[-1],channels[-2]))
         self.decoder.add_module("up3", Up(channels[-2],channels[-3]))
         self.decoder.add_module("up4", Up(channels[-3],channels[-4]))
-        self.decoder.add_module("up5_1", nn.Conv2d(channels[-4], 3, kernel_size=5, stride=1, padding=2, bias=False))
+        self.decoder.add_module("up5_1", nn.Conv2d(channels[-3], 3, kernel_size=5, stride=1, padding=2, bias=False))
         self.decoder.add_module('up5_2', nn.Sigmoid())
         
         self.architecture.add_module("encoder",self.encoder)
@@ -145,7 +150,7 @@ class Auto_Encoders_no_latent(NeuralNetwork):
         self.encoder = nn.Sequential().to(self.device)
         self.decoder = nn.Sequential().to(self.device)    
 
-        channels = [256,256,128,128]
+        channels = [16,16,8,8]
 
         #ENCODER
         self.encoder.add_module('down1', Down(3,channels[0]))
@@ -159,7 +164,7 @@ class Auto_Encoders_no_latent(NeuralNetwork):
         self.decoder.add_module("up2", Up(channels[-1],channels[-2]))
         self.decoder.add_module("up3", Up(channels[-2],channels[-3]))
         self.decoder.add_module("up4", Up(channels[-3],channels[-4]))
-        self.decoder.add_module("up5_1", nn.Conv2d(channels[-4], 3, kernel_size=5, stride=1, padding=2, bias=False))
+        self.decoder.add_module("up5_1", nn.Conv2d(channels[-3], 3, kernel_size=5, stride=1, padding=2, bias=False))
         self.decoder.add_module('up5_2', nn.Sigmoid())
         
         self.architecture.add_module("encoder",self.encoder)

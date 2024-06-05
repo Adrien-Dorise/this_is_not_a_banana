@@ -16,6 +16,7 @@ import dragonflai.model.neural_network_architectures.FCNN as FCNN
 import dragonflai.model.neural_network_architectures.AE as AE
 import dragonflai.model.neural_network_architectures.VAE as VAE
 import dragonflai.model.neural_network_architectures.AE_clustering as AE_clust
+import dragonflai.model.neural_network_architectures.VAE_clustering as VAE_clust
 
 class VAE_loss(nn.Module):
     def __init__(self):
@@ -35,15 +36,16 @@ class SSIM_loss(ssim.SSIM):
 input_size = 128*128*3
 output_size = 128*128*3
 #NN_model = VAE.Variational_Auto_Encoders(input_size,output_size)
-NN_model = AE_clust.Auto_Encoders_latent(input_size,output_size)
+#NN_model = AE_clust.Auto_Encoders_no_latent(input_size,output_size)
+NN_model = VAE_clust.VAE_no_latent(input_size,output_size)
 
 batch_size = 4
-num_epoch = 1000
+num_epoch = 100
 lr = 5e-4
 wd = None
 optimizer = torch.optim.AdamW
-crit = SSIM_loss().cuda()
-#crit = VAE.VAE_loss()
+#crit = SSIM_loss().cuda()
+crit = VAE_loss()
 #crit = nn.MSELoss()
 use_scheduler = True
 

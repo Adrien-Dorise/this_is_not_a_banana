@@ -50,6 +50,8 @@ def visualise_conv_filters(encoder, save_path):
     filters = encoder[-1].layer[0].weight.detach().cpu()
     filters = (filters - filters.min()) / (filters.max() - filters.min())
     filters = filters.reshape(-1,np.shape(filters)[-2],np.shape(filters)[-1])
+    if(filters.size(0) > 256):
+        filters = filters[0:256]
     num_filters = filters.size(0)
     y_size, x_size = get_closest_multiply(num_filters)
     fig, axes = plt.subplots(x_size, y_size, figsize=(10, 10))

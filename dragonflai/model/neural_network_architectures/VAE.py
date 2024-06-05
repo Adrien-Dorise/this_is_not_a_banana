@@ -14,16 +14,6 @@ def init_weights(module):
         nn.init.xavier_uniform_(module.weight)
         module.bias.data.fill_(0.0)
 
-class VAE_loss(nn.Module):
-    def __init__(self):
-        super(VAE_loss, self).__init__()
-        self.mse_loss = nn.MSELoss(reduction="sum")
-
-    def forward(self, input, target, z_mu, z_sigma):
-        loss_MSE = self.mse_loss(input, target)
-        loss_KLD = -0.5 * torch.sum(1 + z_sigma - z_mu.pow(2) - z_sigma.exp())
-
-        return (loss_MSE + loss_KLD)/1000
 
 class Variational_Auto_Encoders(NeuralNetwork):
     """Auto_encoders for image generation
