@@ -36,16 +36,17 @@ class SSIM_loss(ssim.SSIM):
 input_size = 128*128*3
 output_size = 128*128*3
 #NN_model = VAE.Variational_Auto_Encoders(input_size,output_size)
-#NN_model = AE_clust.Auto_Encoders_no_latent(input_size,output_size)
-NN_model = VAE_clust.VAE_no_latent(input_size,output_size)
+#NN_model = VAE_clust.VAE_no_latent(input_size,output_size)
+NN_model = AE_clust.Auto_Encoders_latent(input_size,output_size)
+#NN_model = AE_clust.Auto_Encoders_latent_skip(input_size,output_size)
 
 batch_size = 4
-num_epoch = 100
-lr = 5e-4
+num_epoch = 2000
+lr = 5e-5
 wd = None
 optimizer = torch.optim.AdamW
 #crit = SSIM_loss().cuda()
-crit = VAE_loss()
-#crit = nn.MSELoss()
+#crit = VAE_loss()
+crit = nn.MSELoss()
 use_scheduler = True
 

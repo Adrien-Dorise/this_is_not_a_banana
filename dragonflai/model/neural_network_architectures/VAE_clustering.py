@@ -88,7 +88,8 @@ class VAE_no_latent(NeuralNetwork):
         self.encoder = nn.Sequential().to(self.device)
         self.decoder = nn.Sequential().to(self.device)    
 
-        channels = [64,64,128,128]
+        channels = [128,256,512,1024]
+        latent_dim = 1024
 
         #ENCODER
         self.encoder.add_module('down1', Down(3,channels[0]))
@@ -102,12 +103,12 @@ class VAE_no_latent(NeuralNetwork):
         latent_channels= channels[-1]
         
         self.flatten = nn.Flatten()
-        self.z_mean = nn.Linear(latent_channels*latent_img_shape*latent_img_shape, 2).to(self.device)
-        self.z_log_var = nn.Linear(latent_channels*latent_img_shape*latent_img_shape, 2).to(self.device)
+        self.z_mean = nn.Linear(latent_channels*latent_img_shape*latent_img_shape, latent_dim).to(self.device)
+        self.z_log_var = nn.Linear(latent_channels*latent_img_shape*latent_img_shape, latent_dim).to(self.device)
 
         #DECODER
 
-        self.decoder.add_module("latent1", nn.Linear(2, latent_channels*latent_img_shape*latent_img_shape))
+        self.decoder.add_module("latent1", nn.Linear(latent_dim, latent_channels*latent_img_shape*latent_img_shape))
         self.decoder.add_module("latent_relu1", nn.ReLU())
         #self.decoder.add_module("dropout1", nn.Dropout(dropout))
         self.decoder.add_module("latent_reshape2", nn.Unflatten(1,(latent_channels,latent_img_shape,latent_img_shape)))           
@@ -116,7 +117,7 @@ class VAE_no_latent(NeuralNetwork):
         self.decoder.add_module("up2", Up(channels[-1],channels[-2]))
         self.decoder.add_module("up3", Up(channels[-2],channels[-3]))
         self.decoder.add_module("up4", Up(channels[-3],channels[-4]))
-        self.decoder.add_module("up5_1", nn.Conv2d(channels[-3], 3, kernel_size=5, stride=1, padding=2, bias=False))
+        self.decoder.add_module("up5_1", nn.Conv2d(channels[-4], 3, kernel_size=5, stride=1, padding=2, bias=False))
         self.decoder.add_module('up5_2', nn.Sigmoid())
         
         self.architecture.add_module("encoder",self.encoder)
@@ -170,13 +171,14 @@ class VAE_no_latent(NeuralNetwork):
             self.opt[1] = optimizer(self.decoder.parameters(), lr=learning_rate, 
                             weight_decay=weight_decay)
         
+        self.opt = [optimizer(self.parameters(), lr=learning_rate)]
         self.scaler = []
         self.scaler.append(torch.cuda.amp.GradScaler(enabled=self.use_gpu))
         
     def set_scheduler(self, scheduler=None, *args, **kwargs):
         '''set scheduler'''
-        self.scheduler = []
-        self.scheduler.append(torch.optim.lr_scheduler.ReduceLROnPlateau(self.opt[0], mode='min', factor=0.95, patience=30))
-        self.scheduler.append(torch.optim.lr_scheduler.ReduceLROnPlateau(self.opt[1], mode='min', factor=0.95, patience=30))
-        #self.scheduler = [None]
+        self.scheduler = [None]
+        #self.scheduler.append(torch.optim.lr_scheduler.ReduceLROnPlateau(self.opt[0], mode='min', factor=0.95, patience=30))
+        #self.scheduler.append(torch.optim.lr_scheduler.ReduceLROnPlateau(self.opt[1], mode='min', factor=0.95, patience=30))
+        self.scheduler[0] = torch.optim.lr_scheduler.ReduceLROnPlateau(self.opt[0], mode='min', factor=0.99, patience=60)
     

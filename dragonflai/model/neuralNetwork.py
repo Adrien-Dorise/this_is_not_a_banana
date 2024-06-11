@@ -149,9 +149,9 @@ class NeuralNetwork(nn.Module):
         '''set optimizer'''
         self.opt = [None]
         if weight_decay is None:
-            self.opt[0] = optimizer(self.architecture.parameters(), lr=learning_rate)
+            self.opt[0] = optimizer(self.parameters(), lr=learning_rate)
         else:
-            self.opt[0] = optimizer(self.architecture.parameters(), lr=learning_rate, 
+            self.opt[0] = optimizer(self.parameters(), lr=learning_rate, 
                             weight_decay=weight_decay)
         
         self.scaler = [None]
@@ -162,7 +162,7 @@ class NeuralNetwork(nn.Module):
         self.scheduler = [None]
         
         if use_scheduler:
-            self.scheduler[0] = torch.optim.lr_scheduler.ReduceLROnPlateau(self.opt[0], mode='min', factor=0.99, patience=30) 
+            self.scheduler[0] = torch.optim.lr_scheduler.ReduceLROnPlateau(self.opt[0], mode='min', factor=0.99, patience=60) 
         
     def update_scheduler(self, *args, **kwargs):
         '''update scheduler'''
